@@ -277,8 +277,12 @@ function App() {
           className="collapse-button"
           ref={collapseButtonRef}
           type="button"
-            aria-label={sidebarCollapsed ? "Expand navigation" : "Collapse navigation"}
-          onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
+          aria-label={sidebarCollapsed ? "Expand navigation" : "Collapse navigation"}
+          onClick={() => {
+            setSidebarCollapsed((collapsed) => !collapsed);
+            // LIQ-6: keep keyboard focus on the control after the shell reflows.
+            requestAnimationFrame(() => collapseButtonRef.current?.focus());
+          }}
         >
           {sidebarCollapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
         </button>
@@ -291,7 +295,7 @@ function App() {
                 {external ? (
                   <a
                     className="nav-link"
-                    href={reportingAppUrl}
+                    href={`${reportingAppUrl.replace(/\/$/, "")}/#sales-summary`}
                     title="Opens the standalone reporting application"
                     aria-label="Reports, opens the standalone reporting application"
                     onClick={() => captureProductEvent(posthogClient, "product_navigation", { source: "core", section: "Reports" })}
@@ -564,11 +568,11 @@ function App() {
                   <span><strong>Reconcile 14 transactions</strong><small>Westpac Business account</small></span>
                   <ArrowRight size={17} />
                 </button>
-                <button className="task-item" type="button">
+                <a className="task-item" href={`${reportingAppUrl.replace(/\/$/, "")}/#sales-summary`}>
                   <span className="task-icon"><FileBarChart2 size={17} /></span>
-                  <span><strong>Review your monthly performance</strong><small>Report available in the reports app</small></span>
+                  <span><strong>Review your sales summary</strong><small>Opens the reporting app (legacy deep link)</small></span>
                   <ArrowRight size={17} />
-                </button>
+                </a>
               </div>
             </article>
           </section>
@@ -590,7 +594,19 @@ function App() {
                       <td><strong>{invoice.customer}</strong></td>
                       <td>{invoice.number}</td>
                       <td className={invoice.status === "Overdue" ? "overdue" : ""}>{invoice.due}</td>
-                      <td><span className={`status ${invoice.status === "Overdue" ? "status-overdue" : ""}`}>{invoice.status}</span></td>
+                      <td>
+                        <span
+                          className={`status ${
+                            invoice.status === "Overdue"
+                              ? "status-overdue"
+                              : invoice.status === "Sent"
+                                ? "status-sent"
+                                : "status-awaiting"
+                          }`}
+                        >
+                          {invoice.status}
+                        </span>
+                      </td>
                       <td><strong>{invoice.amount}</strong></td>
                       <td><button className="icon-button small" type="button" aria-label={`Actions for ${invoice.number}`}><MoreHorizontal size={18} /></button></td>
                     </tr>

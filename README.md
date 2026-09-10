@@ -28,7 +28,7 @@ The BFF has synthetic endpoints for:
 - `GET /api/v1/dashboard`
 - `GET /api/v1/invoices`
 
-It deliberately duplicates the organisation contract exposed by the Reporting BFF. The planned migration workflow should identify that shared contract while keeping Core-specific data endpoints separate.
+It deliberately duplicates the organisation contract exposed by the Reporting BFF (`GET /api/v1/organisation`). That duplication is intentional for the Cursor SDK planner demo (Linear LIQ-12): classify the shared contract, keep Core-specific dashboard/invoice endpoints separate, and do not invent a shared BFF yet.
 
 The dashboard organisation and bank-balance card consume the BFF. Remaining screen data is intentionally static synthetic fixture data, so the migration workflow has both live contracts and existing presentation fixtures to classify.
 

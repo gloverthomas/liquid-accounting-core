@@ -31,6 +31,7 @@ const allowedReports = new Set([
   "Profit & Loss",
   "Cash flow",
   "Sales summary",
+  "Revenue summary",
   "Balance sheet",
   "Trial balance",
   "all",
