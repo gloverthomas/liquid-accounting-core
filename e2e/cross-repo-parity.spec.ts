@@ -15,13 +15,17 @@ test.describe("LIQ cross-repo parity seams", () => {
     ).toBeVisible();
   });
 
-  test("Core deep-links to legacy #sales-summary; Reporting flags the miss (LIQ-9)", async ({ page }) => {
+  test("Core deep-links to #revenue-summary (LIQ-9)", async ({ page }) => {
     await page.goto("/");
     const reports = page.getByRole("navigation", { name: "Primary navigation" }).getByRole("link", { name: /Reports/i });
-    await expect(reports).toHaveAttribute("href", /#sales-summary$/);
+    await expect(reports).toHaveAttribute("href", /#revenue-summary$/);
+  });
 
+  test("Legacy #sales-summary redirects to Revenue summary (LIQ-9)", async ({ page }) => {
     await page.goto(`${reportingUrl}/#sales-summary`);
-    await expect(page.getByRole("alert")).toContainText(/Report link out of date|sales-summary|Revenue summary/i);
+    await expect(page).toHaveURL(/#revenue-summary$/);
+    await expect(page.getByRole("heading", { name: "Revenue summary" })).toBeVisible();
+    await expect(page.getByRole("alert")).toHaveCount(0);
   });
 
   test("Canonical Revenue summary hash opens the renamed report (LIQ-9)", async ({ page }) => {

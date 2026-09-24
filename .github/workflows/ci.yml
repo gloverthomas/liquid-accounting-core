@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+  smoke:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Start Vite preview
+        run: |
+          npm run build
+          npx vite preview --host 127.0.0.1 --port 3000 &
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:3000/ >/dev/null && exit 0
+            sleep 1
+          done
+          exit 1
+      - name: Smoke
+        run: npx playwright test e2e/smoke.spec.ts
+        env:
+          CORE_APP_URL: http://127.0.0.1:3000

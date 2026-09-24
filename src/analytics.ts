@@ -17,6 +17,7 @@ const allowedEvents = new Set([
 ]);
 
 const allowedSections = new Set([
+  "Dashboard",
   "Sales",
   "Purchases",
   "Banking",
@@ -75,29 +76,27 @@ export function createPosthogClient(app: "core" | "reporting"): PostHog | null {
     return null;
   }
 
+  const distinctId = `liquid-demo-${app}`;
+
   posthog.init(token, {
     api_host: host,
-    defaults: "2026-05-30",
     autocapture: false,
     capture_pageview: true,
+    capture_pageleave: true,
     disable_session_recording: true,
-    mask_all_text: true,
-    mask_all_element_attributes: true,
+    // Demo runs in Playwright / Cursor browser where navigator.webdriver is true;
+    // PostHog treats that as a bot and silently drops every capture otherwise.
+    opt_out_useragent_filter: true,
+    // Project default is identified_only — keep person profiles for demo distinct IDs.
+    person_profiles: "always",
     persistence: "memory",
+    bootstrap: { distinctID: distinctId },
     property_denylist: ["$ip", "$email", "$name", "amount", "netProfit", "cashAtBank"],
-    before_send: (event) => {
-      if (!event || !allowedEvents.has(event.event)) {
-        return null;
-      }
-
-      event.properties = {
-        ...sanitiseProperties(event.properties as Record<string, Property> | undefined),
-        app,
-      };
-      return event;
-    },
   });
 
+  posthog.identify(distinctId, { app });
+  posthog.register({ app });
+  posthog.capture("$pageview", { source: app, section: app === "core" ? "Dashboard" : "all" });
   return posthog;
 }
 
