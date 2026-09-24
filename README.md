@@ -34,6 +34,18 @@ The dashboard organisation and bank-balance card consume the BFF. Remaining scre
 
 The server binds to loopback only, requires a bearer token from `LIQUID_BFF_DEMO_TOKEN`, only allows the local Core app origin by default, rate limits requests, and returns no-store responses. It refuses to start outside development/test mode. It is a demo boundary, not a production authentication implementation.
 
+## PostHog
+
+Product analytics is optional and privacy-constrained. Copy `.env.example` to `.env.local` and set a project token (`phc_...`) plus an official PostHog host. If those values are missing or invalid, the app renders without analytics.
+
+You can also run the interactive installer:
+
+```bash
+npx -y @posthog/wizard@latest
+```
+
+That wizard cannot be completed non-interactively here, so both apps also include a manual React SDK setup. Autocapture and session replay are off. Only allowlisted events leave the browser (`product_navigation`, `create_dialog_opened`, `bff_status`, plus PostHog pageview/pageleave). Financial amounts, organisation names, and other PII are not captured.
+
 To point the app at a deployed reporting service, set this before building:
 
 ```bash

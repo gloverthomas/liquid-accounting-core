@@ -27,10 +27,14 @@ import {
   WalletCards,
   X,
 } from "lucide-react";
+import { PostHogProvider } from "@posthog/react";
 import { WorkspacePage, type WorkspaceSection } from "./components/WorkspacePage";
+import { captureProductEvent, createPosthogClient } from "./analytics";
 import liquidLogo from "./media/liquid-logo.png";
 import liquidMark from "./media/liquid-mark.png";
 import "./styles.css";
+
+const posthogClient = createPosthogClient("core");
 
 type NavItem = {
   label: string;
@@ -165,9 +169,11 @@ function App() {
         setOrganisation(nextOrganisation);
         setDashboard(nextDashboard);
         setBffAvailable(true);
+        captureProductEvent(posthogClient, "bff_status", { source: "core", connected: true });
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") return;
         setBffAvailable(false);
+        captureProductEvent(posthogClient, "bff_status", { source: "core", connected: false });
         console.info("Core BFF unavailable; displaying synthetic fallback data.");
       }
     };
@@ -198,6 +204,7 @@ function App() {
       window.history.pushState({}, "", `${window.location.pathname}${window.location.search}${nextHash}`);
     }
     setActiveSection(section);
+    captureProductEvent(posthogClient, "product_navigation", { source: "core", section });
   }, []);
 
   const closeInvoiceModal = useCallback(() => {
@@ -208,7 +215,8 @@ function App() {
   const openCreateDialog = useCallback((event: ReactMouseEvent<HTMLButtonElement>) => {
     modalTriggerRef.current = event.currentTarget;
     setInvoiceModalOpen(true);
-  }, []);
+    captureProductEvent(posthogClient, "create_dialog_opened", { source: "core", section: activeSection });
+  }, [activeSection]);
 
   useEffect(() => {
     if (!invoiceModalOpen) {
@@ -286,6 +294,7 @@ function App() {
                     href={reportingAppUrl}
                     title="Opens the standalone reporting application"
                     aria-label="Reports, opens the standalone reporting application"
+                    onClick={() => captureProductEvent(posthogClient, "product_navigation", { source: "core", section: "Reports" })}
                   >
                     <Icon size={19} />
                     <span className="sidebar-label">{label}</span>
@@ -623,4 +632,12 @@ function App() {
 
 export default App;
 
-createRoot(document.getElementById("root")!).render(<App />);
+createRoot(document.getElementById("root")!).render(
+  posthogClient ? (
+    <PostHogProvider client={posthogClient}>
+      <App />
+    </PostHogProvider>
+  ) : (
+    <App />
+  ),
+);
