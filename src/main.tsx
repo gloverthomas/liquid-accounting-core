@@ -245,7 +245,7 @@ function App() {
   }, [activeSection]);
 
   const submitInvoiceAndBreak = useCallback(async () => {
-    setSignalStatus("Saving invoice… signalling workflow…");
+    setSignalStatus("Opening Revenue summary…");
     await fireBrokenInvoiceDeepLink({
       posthog: posthogClient,
       reportingAppUrl,
@@ -258,7 +258,7 @@ function App() {
   const openBrokenReports = useCallback(
     async (event: ReactMouseEvent<HTMLAnchorElement>) => {
       event.preventDefault();
-      setSignalStatus("Reports nav → missing Reporting hash…");
+      setSignalStatus("Opening Reports…");
       await fireBrokenInvoiceDeepLink({
         posthog: posthogClient,
         reportingAppUrl,
@@ -695,8 +695,7 @@ function App() {
             {activeSection === "Dashboard" || activeSection === "Sales" ? (
               <>
                 <p>
-                  Fill in the draft below. Continue opens Reporting at{" "}
-                  <code>#{BROKEN_INVOICE_REPORT_HASH}</code> and signals the governed workflow.
+                  Fill in the draft below. Create opens Revenue summary in Reporting (<code>#{BROKEN_INVOICE_REPORT_HASH}</code>).
                 </p>
                 <form
                   className="invoice-form"
@@ -735,7 +734,7 @@ function App() {
                       Not now
                     </button>
                     <button className="primary-button" type="submit">
-                      Create &amp; view report <ArrowRight size={17} />
+                      Create &amp; open report <ArrowRight size={17} />
                     </button>
                   </div>
                 </form>
