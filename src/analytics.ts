@@ -81,7 +81,8 @@ export function createPosthogClient(app: "core" | "reporting"): PostHog | null {
   posthog.init(token, {
     api_host: host,
     autocapture: false,
-    capture_pageview: true,
+    // Manual $pageview below — avoid double-counting with PostHog's auto initial pageview.
+    capture_pageview: false,
     capture_pageleave: true,
     disable_session_recording: true,
     // Demo runs in Playwright / Cursor browser where navigator.webdriver is true;
