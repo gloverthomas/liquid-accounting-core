@@ -1,0 +1,116 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+  smoke:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Start Vite preview
+        run: |
+          npm run build
+          npx vite preview --host 127.0.0.1 --port 3000 &
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:3000/ >/dev/null && exit 0
+            sleep 1
+          done
+          exit 1
+      - name: Smoke
+        run: npx playwright test e2e/smoke.spec.ts
+        env:
+          CORE_APP_URL: http://127.0.0.1:3000
+
+  parity-proof:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout Core
+        uses: actions/checkout@v4
+        with:
+          path: core
+      - name: Checkout Reporting
+        uses: actions/checkout@v4
+        with:
+          repository: gloverthomas/liquid-accounting-reporting
+          path: reporting
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            core/package-lock.json
+            reporting/package-lock.json
+      - name: Install + build both apps
+        run: |
+          (cd core && npm ci && npm run build)
+          (cd reporting && npm ci && npm run build)
+      - name: Install Playwright
+        working-directory: core
+        run: npx playwright install --with-deps chromium
+      - name: Start Core + Reporting previews
+        run: |
+          (cd core && npx vite preview --host 127.0.0.1 --port 3000) &
+          (cd reporting && npx vite preview --host 127.0.0.1 --port 3001) &
+          for i in $(seq 1 45); do
+            curl -sf http://127.0.0.1:3000/ >/dev/null && curl -sf http://127.0.0.1:3001/ >/dev/null && exit 0
+            sleep 1
+          done
+          exit 1
+      - name: Parity + Help screenshots
+        working-directory: core
+        run: npm run test:e2e:parity
+        env:
+          CORE_APP_URL: http://127.0.0.1:3000
+          REPORTING_APP_URL: http://127.0.0.1:3001
+      - name: Upload screenshot artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: help-parity-proof
+          path: core/e2e/proof/*.png
+          if-no-files-found: warn
+      - name: Comment proof on PR
+        if: github.event_name == 'pull_request' && always()
+        working-directory: core
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          FILES=$(ls e2e/proof/*.png 2>/dev/null || true)
+          BODY="## Visual proof (Playwright)
+          Screenshots from \`parity-proof\` CI are attached as artifact **help-parity-proof**.
+          Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+          Also drop copies under \`docs/pr-proof/\` on the branch so images render in the PR Files tab.
+          "
+          if [ -n "$FILES" ]; then
+            BODY="${BODY}
+          Generated: $(echo "$FILES" | xargs -n1 basename | sed 's/^/- /')"
+          fi
+          gh pr comment "${{ github.event.pull_request.number }}" --repo "${{ github.repository }}" --body "$BODY" || true

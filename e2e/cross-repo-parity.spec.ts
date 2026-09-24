@@ -1,6 +1,16 @@
 import { expect, test } from "@playwright/test";
+import { mkdirSync } from "node:fs";
+import { join } from "node:path";
 
 const reportingUrl = process.env.REPORTING_APP_URL ?? "http://localhost:3001";
+const proofDir = join(process.cwd(), "e2e/proof");
+
+async function captureProof(page: import("@playwright/test").Page, name: string) {
+  mkdirSync(proofDir, { recursive: true });
+  const path = join(proofDir, name);
+  await page.screenshot({ path, fullPage: false });
+  return path;
+}
 
 test.describe("LIQ cross-repo parity seams", () => {
   test("Core shell uses Create; Reporting still shows New (LIQ-8)", async ({ page }) => {
@@ -21,18 +31,19 @@ test.describe("LIQ cross-repo parity seams", () => {
   });
 
   test("Help opens in both apps (LIQ-16)", async ({ page }) => {
-    const assertHelpMenu = async () => {
+    const assertHelpMenu = async (shot: string) => {
       await page.getByRole("button", { name: "Help", exact: true }).click();
       await expect(page.getByRole("menu", { name: "Help centre" })).toBeVisible();
       await expect(page.getByRole("menuitem", { name: "Contact support" })).toBeVisible();
+      await captureProof(page, shot);
     };
 
     await page.goto("/");
-    await assertHelpMenu();
+    await assertHelpMenu("liq-16-core-help-open.png");
 
     await page.goto(reportingUrl);
     await expect(page.getByRole("alert")).toHaveCount(0);
-    await assertHelpMenu();
+    await assertHelpMenu("liq-16-reporting-help-open.png");
   });
 
   test("Core Reports deep-link to #revenue-summary", async ({ page }) => {
