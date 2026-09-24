@@ -31,8 +31,7 @@ import { PostHogProvider } from "@posthog/react";
 import { WorkspacePage, type WorkspaceSection } from "./components/WorkspacePage";
 import { captureProductEvent, createPosthogClient } from "./analytics";
 import {
-  BROKEN_INVOICE_REPORT_HASH,
-  fireBrokenInvoiceDeepLink,
+  openReportingRevenueSummary,
   reportingInvoicePerformanceUrl,
 } from "./demoSignal";
 import { initSentry, reportCrossAppUrlDrift, Sentry } from "./sentry";
@@ -152,12 +151,14 @@ function App() {
   const [invoiceItem, setInvoiceItem] = useState("Wholesale coffee beans — 12kg");
   const [invoiceAmount, setInvoiceAmount] = useState("1,280.00");
   const [invoiceDue, setInvoiceDue] = useState("7 Oct 2026");
-  const [signalStatus, setSignalStatus] = useState<string | null>(null);
+  const [helpMenuOpen, setHelpMenuOpen] = useState(false);
+  const [invoiceSaved, setInvoiceSaved] = useState(false);
   const [chartsVisible, setChartsVisible] = useState(false);
   const sidebarRef = useRef<HTMLElement>(null);
   const collapseButtonRef = useRef<HTMLButtonElement>(null);
   const modalTriggerRef = useRef<HTMLElement>(null);
   const modalRef = useRef<HTMLElement>(null);
+  const helpMenuRef = useRef<HTMLDivElement>(null);
   const pageHeadingRef = useRef<HTMLHeadingElement>(null);
   const createDialog = activeSection === "Purchases"
     ? { eyebrow: "New bill", title: "Create a bill", description: "This demo keeps bill creation local. The next step is to select a supplier and add bill details." }
@@ -168,8 +169,7 @@ function App() {
         : {
             eyebrow: "New invoice",
             title: "Create an invoice",
-            description:
-              "Draft a customer invoice, then open Invoice performance in Reporting to see where it lands.",
+            description: "Select a customer and line item, then save the draft in Core.",
           };
 
   useEffect(() => {
@@ -233,33 +233,30 @@ function App() {
 
   const closeInvoiceModal = useCallback(() => {
     setInvoiceModalOpen(false);
-    setSignalStatus(null);
+    setInvoiceSaved(false);
     requestAnimationFrame(() => modalTriggerRef.current?.focus());
   }, []);
 
   const openCreateDialog = useCallback((event: ReactMouseEvent<HTMLButtonElement>) => {
     modalTriggerRef.current = event.currentTarget;
     setInvoiceModalOpen(true);
-    setSignalStatus(null);
+    setInvoiceSaved(false);
     captureProductEvent(posthogClient, "create_dialog_opened", { source: "core", section: activeSection });
   }, [activeSection]);
 
-  const submitInvoiceAndBreak = useCallback(async () => {
-    setSignalStatus("Saving invoice… signalling workflow…");
-    await fireBrokenInvoiceDeepLink({
-      posthog: posthogClient,
-      reportingAppUrl,
-      source: "create_invoice",
-      customer: invoiceCustomer,
-      amount: invoiceAmount,
-    });
-  }, [invoiceAmount, invoiceCustomer]);
+  const saveInvoiceDraft = useCallback(() => {
+    setInvoiceSaved(true);
+    captureProductEvent(posthogClient, "create_dialog_opened", { source: "core", section: "Sales" });
+    window.setTimeout(() => {
+      closeInvoiceModal();
+      navigateTo("Sales");
+    }, 700);
+  }, [closeInvoiceModal, navigateTo]);
 
-  const openBrokenReports = useCallback(
-    async (event: ReactMouseEvent<HTMLAnchorElement>) => {
+  const openReports = useCallback(
+    (event: ReactMouseEvent<HTMLAnchorElement>) => {
       event.preventDefault();
-      setSignalStatus("Reports nav → missing Reporting hash…");
-      await fireBrokenInvoiceDeepLink({
+      void openReportingRevenueSummary({
         posthog: posthogClient,
         reportingAppUrl,
         source: "reports_nav",
@@ -267,6 +264,29 @@ function App() {
     },
     [],
   );
+
+  const toggleHelpMenu = useCallback(() => {
+    setHelpMenuOpen((open) => !open);
+    captureProductEvent(posthogClient, "product_navigation", { source: "core", section: "Dashboard" });
+  }, []);
+
+  useEffect(() => {
+    if (!helpMenuOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (!helpMenuRef.current?.contains(event.target as Node)) {
+        setHelpMenuOpen(false);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setHelpMenuOpen(false);
+    };
+    window.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [helpMenuOpen]);
 
   useEffect(() => {
     if (!invoiceModalOpen) {
@@ -349,7 +369,7 @@ function App() {
                     title="Opens the standalone reporting application"
                     aria-label="Reports, opens the standalone reporting application"
                     onClick={(event) => {
-                      void openBrokenReports(event);
+                      void openReports(event);
                     }}
                   >
                     <Icon size={19} />
@@ -408,7 +428,14 @@ function App() {
             <Settings size={19} />
             <span className="sidebar-label">Settings</span>
           </button>
-          <button className="nav-link" type="button" title="Help centre" aria-label="Help centre">
+          <button
+            className="nav-link"
+            type="button"
+            title="Help centre"
+            aria-label="Help centre"
+            aria-expanded={helpMenuOpen}
+            onClick={toggleHelpMenu}
+          >
             <CircleHelp size={19} />
             <span className="sidebar-label">Help centre</span>
           </button>
@@ -434,10 +461,39 @@ function App() {
               <Bell size={18} />
               <span className="notification-dot" />
             </button>
-            <button className="help-button" type="button">
-              <CircleHelp size={17} />
-              <span>Help</span>
-            </button>
+            <div className="help-menu" ref={helpMenuRef}>
+              <button
+                className="help-button"
+                type="button"
+                aria-expanded={helpMenuOpen}
+                aria-haspopup="menu"
+                onClick={toggleHelpMenu}
+              >
+                <CircleHelp size={17} />
+                <span>Help</span>
+              </button>
+              {helpMenuOpen ? (
+                <div className="help-popover" role="menu" aria-label="Help centre">
+                  <p className="help-popover-title">Help centre</p>
+                  <button type="button" role="menuitem" onClick={() => setHelpMenuOpen(false)}>
+                    Keyboard shortcuts
+                  </button>
+                  <button type="button" role="menuitem" onClick={() => setHelpMenuOpen(false)}>
+                    Contact support
+                  </button>
+                  <button type="button" role="menuitem" onClick={() => setHelpMenuOpen(false)}>
+                    What’s new in Liquid
+                  </button>
+                  <a
+                    role="menuitem"
+                    href="https://liquid-accounting.world"
+                    onClick={() => setHelpMenuOpen(false)}
+                  >
+                    Product docs
+                  </a>
+                </div>
+              ) : null}
+            </div>
             <button
               className="business-switcher"
               type="button"
@@ -624,7 +680,7 @@ function App() {
                   className="task-item"
                   href={reportingInvoicePerformanceUrl(reportingAppUrl)}
                   onClick={(event) => {
-                    void openBrokenReports(event);
+                    void openReports(event);
                   }}
                 >
                   <span className="task-icon"><FileBarChart2 size={17} /></span>
@@ -694,15 +750,12 @@ function App() {
             <h2 id="create-dialog-title">{createDialog.title}</h2>
             {activeSection === "Dashboard" || activeSection === "Sales" ? (
               <>
-                <p>
-                  Fill in the draft below. Continue opens Reporting at{" "}
-                  <code>#{BROKEN_INVOICE_REPORT_HASH}</code> and signals the governed workflow.
-                </p>
+                <p>Fill in the draft below. Saving keeps you in Core on the Sales invoices list.</p>
                 <form
                   className="invoice-form"
                   onSubmit={(event) => {
                     event.preventDefault();
-                    void submitInvoiceAndBreak();
+                    saveInvoiceDraft();
                   }}
                 >
                   <label>
@@ -729,13 +782,13 @@ function App() {
                       <input value={invoiceDue} onChange={(event) => setInvoiceDue(event.target.value)} />
                     </label>
                   </div>
-                  {signalStatus ? <p className="invoice-signal" role="status">{signalStatus}</p> : null}
+                  {invoiceSaved ? <p className="invoice-signal" role="status">Draft saved</p> : null}
                   <div className="modal-actions">
                     <button className="secondary-button" type="button" onClick={closeInvoiceModal}>
                       Not now
                     </button>
                     <button className="primary-button" type="submit">
-                      Create &amp; view report <ArrowRight size={17} />
+                      Save draft <ArrowRight size={17} />
                     </button>
                   </div>
                 </form>

@@ -20,13 +20,21 @@ test.describe("LIQ cross-repo parity seams", () => {
     await expect(page.getByRole("alert")).toContainText(/Report link out of date|sales-summary|Revenue summary/i);
   });
 
-  test("Core Reports / Create Invoice invent #invoice-performance (LIQ-15)", async ({ page }) => {
+  test("Core Help opens a menu; Reporting Help is broken (LIQ-16)", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: "Help", exact: true }).click();
+    await expect(page.getByRole("menu", { name: "Help centre" })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "Contact support" })).toBeVisible();
+
+    await page.goto(reportingUrl);
+    await page.getByRole("button", { name: "Help", exact: true }).click();
+    await expect(page.getByRole("alert")).toContainText(/Help centre|LIQ-16/i);
+  });
+
+  test("Core Reports deep-link to #revenue-summary", async ({ page }) => {
     await page.goto("/");
     const reports = page.getByRole("navigation", { name: "Primary navigation" }).getByRole("link", { name: /Reports/i });
-    await expect(reports).toHaveAttribute("href", /#invoice-performance$/);
-
-    await page.goto(`${reportingUrl}/#invoice-performance`);
-    await expect(page.getByRole("alert")).toContainText(/invoice-performance|LIQ-15|No report is registered/i);
+    await expect(reports).toHaveAttribute("href", /#revenue-summary$/);
   });
 
   test("Canonical Revenue summary hash opens the renamed report (LIQ-9)", async ({ page }) => {
