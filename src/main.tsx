@@ -570,7 +570,7 @@ function App() {
                 </button>
                 <a className="task-item" href={`${reportingAppUrl.replace(/\/$/, "")}/#revenue-summary`}>
                   <span className="task-icon"><FileBarChart2 size={17} /></span>
-                  <span><strong>Review your sales summary</strong><small>Opens the reporting app (legacy deep link)</small></span>
+                  <span><strong>Review your revenue summary</strong><small>Opens the reporting app</small></span>
                   <ArrowRight size={17} />
                 </a>
               </div>

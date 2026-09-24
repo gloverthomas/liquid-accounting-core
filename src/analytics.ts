@@ -93,6 +93,24 @@ export function createPosthogClient(app: "core" | "reporting"): PostHog | null {
     persistence: "memory",
     bootstrap: { distinctID: distinctId },
     property_denylist: ["$ip", "$email", "$name", "amount", "netProfit", "cashAtBank"],
+    before_send: (event) => {
+      if (!event || !allowedEvents.has(event.event)) {
+        return null;
+      }
+      // Fail-closed on custom props only — never strip PostHog system/$ keys (that killed ingest).
+      const props = event.properties;
+      if (props) {
+        for (const key of Object.keys(props)) {
+          if (key.startsWith("$") || key === "token" || key === "distinct_id") {
+            continue;
+          }
+          if (!isAllowedProperty(key, props[key] as Property)) {
+            delete props[key];
+          }
+        }
+      }
+      return event;
+    },
   });
 
   posthog.identify(distinctId, { app });
