@@ -30,10 +30,12 @@ import {
 import { PostHogProvider } from "@posthog/react";
 import { WorkspacePage, type WorkspaceSection } from "./components/WorkspacePage";
 import { captureProductEvent, createPosthogClient } from "./analytics";
+import { initSentry, reportCrossAppUrlDrift, Sentry } from "./sentry";
 import liquidLogo from "./media/liquid-logo.png";
 import liquidMark from "./media/liquid-mark.png";
 import "./styles.css";
 
+initSentry("core");
 const posthogClient = createPosthogClient("core");
 
 type NavItem = {
@@ -98,6 +100,11 @@ function resolveReportingAppUrl(configuredUrl: string | undefined) {
 }
 
 const reportingAppUrl = resolveReportingAppUrl(import.meta.env.VITE_REPORTING_APP_URL);
+reportCrossAppUrlDrift({
+  app: "core",
+  configuredUrl: reportingAppUrl,
+  role: "reporting-target",
+});
 
 function sectionFromLocation(): AppSection {
   const section = window.location.hash.slice(1);
@@ -649,11 +656,13 @@ function App() {
 export default App;
 
 createRoot(document.getElementById("root")!).render(
-  posthogClient ? (
-    <PostHogProvider client={posthogClient}>
+  <Sentry.ErrorBoundary fallback={<p>Something went wrong loading Liquid.</p>}>
+    {posthogClient ? (
+      <PostHogProvider client={posthogClient}>
+        <App />
+      </PostHogProvider>
+    ) : (
       <App />
-    </PostHogProvider>
-  ) : (
-    <App />
-  ),
+    )}
+  </Sentry.ErrorBoundary>,
 );
