@@ -152,6 +152,7 @@ function App() {
   const [invoiceAmount, setInvoiceAmount] = useState("1,280.00");
   const [invoiceDue, setInvoiceDue] = useState("7 Oct 2026");
   const [helpMenuOpen, setHelpMenuOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [invoiceSaved, setInvoiceSaved] = useState(false);
   const [chartsVisible, setChartsVisible] = useState(false);
   const sidebarRef = useRef<HTMLElement>(null);
@@ -159,6 +160,7 @@ function App() {
   const modalTriggerRef = useRef<HTMLElement>(null);
   const modalRef = useRef<HTMLElement>(null);
   const helpMenuRef = useRef<HTMLDivElement>(null);
+  const notificationsRef = useRef<HTMLDivElement>(null);
   const pageHeadingRef = useRef<HTMLHeadingElement>(null);
   const createDialog = activeSection === "Purchases"
     ? { eyebrow: "New bill", title: "Create a bill", description: "This demo keeps bill creation local. The next step is to select a supplier and add bill details." }
@@ -266,19 +268,33 @@ function App() {
   );
 
   const toggleHelpMenu = useCallback(() => {
+    setNotificationsOpen(false);
     setHelpMenuOpen((open) => !open);
     captureProductEvent(posthogClient, "product_navigation", { source: "core", section: "Dashboard" });
   }, []);
 
+  const toggleNotifications = useCallback(() => {
+    setHelpMenuOpen(false);
+    setNotificationsOpen((open) => !open);
+    captureProductEvent(posthogClient, "product_navigation", { source: "core", section: "Notifications" });
+  }, []);
+
   useEffect(() => {
-    if (!helpMenuOpen) return;
+    if (!helpMenuOpen && !notificationsOpen) return;
     const onPointerDown = (event: PointerEvent) => {
-      if (!helpMenuRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (helpMenuOpen && !helpMenuRef.current?.contains(target)) {
         setHelpMenuOpen(false);
+      }
+      if (notificationsOpen && !notificationsRef.current?.contains(target)) {
+        setNotificationsOpen(false);
       }
     };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setHelpMenuOpen(false);
+      if (event.key === "Escape") {
+        setHelpMenuOpen(false);
+        setNotificationsOpen(false);
+      }
     };
     window.addEventListener("pointerdown", onPointerDown);
     window.addEventListener("keydown", onKeyDown);
@@ -286,7 +302,7 @@ function App() {
       window.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [helpMenuOpen]);
+  }, [helpMenuOpen, notificationsOpen]);
 
   useEffect(() => {
     if (!invoiceModalOpen) {
@@ -457,10 +473,33 @@ function App() {
             <kbd>⌘ K</kbd>
           </div>
           <div className="topbar-actions">
-            <button className="icon-button" type="button" aria-label="Notifications">
-              <Bell size={18} />
-              <span className="notification-dot" />
-            </button>
+            <div className="notifications-menu" ref={notificationsRef}>
+              <button
+                className="icon-button"
+                type="button"
+                aria-label="Notifications"
+                aria-expanded={notificationsOpen}
+                aria-haspopup="menu"
+                onClick={toggleNotifications}
+              >
+                <Bell size={18} />
+                <span className="notification-dot" />
+              </button>
+              {notificationsOpen ? (
+                <div className="help-popover notifications-popover" role="menu" aria-label="Notifications">
+                  <p className="help-popover-title">Notifications</p>
+                  <button type="button" role="menuitem" onClick={() => setNotificationsOpen(false)}>
+                    Invoice INV-1042 was paid
+                  </button>
+                  <button type="button" role="menuitem" onClick={() => setNotificationsOpen(false)}>
+                    Bank feed needs review
+                  </button>
+                  <button type="button" role="menuitem" onClick={() => setNotificationsOpen(false)}>
+                    Payroll run is ready
+                  </button>
+                </div>
+              ) : null}
+            </div>
             <div className="help-menu" ref={helpMenuRef}>
               <button
                 className="help-button"

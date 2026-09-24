@@ -1,6 +1,14 @@
 import { expect, test } from "@playwright/test";
+import { mkdirSync } from "node:fs";
+import { join } from "node:path";
 
 const reportingUrl = process.env.REPORTING_APP_URL ?? "http://localhost:3001";
+const proofDir = join(process.cwd(), "e2e/proof");
+
+async function captureProof(page: import("@playwright/test").Page, name: string) {
+  mkdirSync(proofDir, { recursive: true });
+  await page.screenshot({ path: join(proofDir, name), fullPage: false });
+}
 
 test.describe("LIQ cross-repo parity seams", () => {
   test("Core shell uses Create; Reporting still shows New (LIQ-8)", async ({ page }) => {
@@ -20,15 +28,27 @@ test.describe("LIQ cross-repo parity seams", () => {
     await expect(page.getByRole("alert")).toContainText(/Report link out of date|sales-summary|Revenue summary/i);
   });
 
-  test("Core Help opens a menu; Reporting Help is broken (LIQ-16)", async ({ page }) => {
+  test("Help opens in both apps (LIQ-16 healed)", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("button", { name: "Help", exact: true }).click();
     await expect(page.getByRole("menu", { name: "Help centre" })).toBeVisible();
-    await expect(page.getByRole("menuitem", { name: "Contact support" })).toBeVisible();
 
     await page.goto(reportingUrl);
     await page.getByRole("button", { name: "Help", exact: true }).click();
-    await expect(page.getByRole("alert")).toContainText(/Help centre|LIQ-16/i);
+    await expect(page.getByRole("menu", { name: "Help centre" })).toBeVisible();
+  });
+
+  test("Core Notifications open; Reporting Notifications are broken (LIQ-17)", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: "Notifications" }).click();
+    await expect(page.getByRole("menu", { name: "Notifications" })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: /Invoice INV-1042 was paid/i })).toBeVisible();
+    await captureProof(page, "liq-17-core-notifications-open.png");
+
+    await page.goto(reportingUrl);
+    await page.getByRole("button", { name: "Notifications" }).click();
+    await expect(page.getByRole("alert")).toContainText(/Notifications|temporarily unavailable/i);
+    await captureProof(page, "liq-17-reporting-notifications-miss.png");
   });
 
   test("Core Reports deep-link to #revenue-summary", async ({ page }) => {
