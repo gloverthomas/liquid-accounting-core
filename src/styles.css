@@ -198,8 +198,16 @@ td strong { color: #374151; font-weight: 600; }
 .modal-layer { position: fixed; z-index: 10; inset: 0; display: grid; place-items: center; padding: 18px; }
 .modal-backdrop { position: absolute; z-index: -1; inset: 0; border: 0; background: rgba(17,24,39,.45); }
 .invoice-modal { position: relative; width: min(430px, 100%); border-radius: 16px; background: #fff; box-shadow: 0 24px 70px rgba(17,24,39,.22); padding: 31px; }
+.invoice-modal-wide { width: min(520px, 100%); }
 .invoice-modal h2 { margin: 6px 0 9px; font-size: 25px; }
 .invoice-modal p:not(.eyebrow) { margin-bottom: 22px; color: #6b7280; font-size: 14px; line-height: 1.55; }
+.invoice-modal code { font-size: 12px; background: #f3f4f6; padding: 1px 6px; border-radius: 4px; color: #111827; }
+.invoice-form { display: grid; gap: 14px; margin-bottom: 8px; }
+.invoice-form label { display: grid; gap: 6px; font-size: 13px; font-weight: 600; color: #374151; }
+.invoice-form input,
+.invoice-form select { width: 100%; border: 1px solid #d1d5db; border-radius: 10px; padding: 10px 12px; font: inherit; font-weight: 500; color: #111827; background: #fff; }
+.invoice-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.invoice-signal { margin: 0 !important; color: #b45309 !important; font-weight: 600; }
 .modal-close { position: absolute; top: 13px; right: 13px; }
 .modal-icon { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 11px; background: #fff0f0; color: #e02025; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 9px; }

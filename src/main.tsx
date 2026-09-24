@@ -30,10 +30,17 @@ import {
 import { PostHogProvider } from "@posthog/react";
 import { WorkspacePage, type WorkspaceSection } from "./components/WorkspacePage";
 import { captureProductEvent, createPosthogClient } from "./analytics";
+import {
+  BROKEN_INVOICE_REPORT_HASH,
+  fireBrokenInvoiceDeepLink,
+  reportingInvoicePerformanceUrl,
+} from "./demoSignal";
+import { initSentry, reportCrossAppUrlDrift, Sentry } from "./sentry";
 import liquidLogo from "./media/liquid-logo.png";
 import liquidMark from "./media/liquid-mark.png";
 import "./styles.css";
 
+initSentry("core");
 const posthogClient = createPosthogClient("core");
 
 type NavItem = {
@@ -98,6 +105,13 @@ function resolveReportingAppUrl(configuredUrl: string | undefined) {
 }
 
 const reportingAppUrl = resolveReportingAppUrl(import.meta.env.VITE_REPORTING_APP_URL);
+reportCrossAppUrlDrift({
+  app: "core",
+  configuredUrl: reportingAppUrl,
+  role: "reporting-target",
+});
+
+const invoiceCustomers = ["Blue Bottle Roasters", "Northside Cafe Group", "Harbour Espresso", "Atlas Wholesale"];
 
 function sectionFromLocation(): AppSection {
   const section = window.location.hash.slice(1);
@@ -134,6 +148,11 @@ function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.matchMedia("(max-width: 980px)").matches);
   const [expandedNav, setExpandedNav] = useState<string | null>(null);
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
+  const [invoiceCustomer, setInvoiceCustomer] = useState(invoiceCustomers[0]);
+  const [invoiceItem, setInvoiceItem] = useState("Wholesale coffee beans — 12kg");
+  const [invoiceAmount, setInvoiceAmount] = useState("1,280.00");
+  const [invoiceDue, setInvoiceDue] = useState("7 Oct 2026");
+  const [signalStatus, setSignalStatus] = useState<string | null>(null);
   const [chartsVisible, setChartsVisible] = useState(false);
   const sidebarRef = useRef<HTMLElement>(null);
   const collapseButtonRef = useRef<HTMLButtonElement>(null);
@@ -146,7 +165,12 @@ function App() {
       ? { eyebrow: "Bank reconciliation", title: "Reconcile transactions", description: "This demo keeps reconciliation local. The next step is to match transactions to your records." }
       : activeSection === "Contacts"
         ? { eyebrow: "New contact", title: "Add a contact", description: "This demo keeps contact creation local. The next step is to add contact details." }
-        : { eyebrow: "New invoice", title: "Create an invoice", description: "This demo keeps invoice creation local. The next step is to select a customer and add invoice items." };
+        : {
+            eyebrow: "New invoice",
+            title: "Create an invoice",
+            description:
+              "Draft a customer invoice, then open Invoice performance in Reporting to see where it lands.",
+          };
 
   useEffect(() => {
     const revealCharts = window.setTimeout(() => setChartsVisible(true), 180);
@@ -209,14 +233,40 @@ function App() {
 
   const closeInvoiceModal = useCallback(() => {
     setInvoiceModalOpen(false);
+    setSignalStatus(null);
     requestAnimationFrame(() => modalTriggerRef.current?.focus());
   }, []);
 
   const openCreateDialog = useCallback((event: ReactMouseEvent<HTMLButtonElement>) => {
     modalTriggerRef.current = event.currentTarget;
     setInvoiceModalOpen(true);
+    setSignalStatus(null);
     captureProductEvent(posthogClient, "create_dialog_opened", { source: "core", section: activeSection });
   }, [activeSection]);
+
+  const submitInvoiceAndBreak = useCallback(async () => {
+    setSignalStatus("Saving invoice… signalling workflow…");
+    await fireBrokenInvoiceDeepLink({
+      posthog: posthogClient,
+      reportingAppUrl,
+      source: "create_invoice",
+      customer: invoiceCustomer,
+      amount: invoiceAmount,
+    });
+  }, [invoiceAmount, invoiceCustomer]);
+
+  const openBrokenReports = useCallback(
+    async (event: ReactMouseEvent<HTMLAnchorElement>) => {
+      event.preventDefault();
+      setSignalStatus("Reports nav → missing Reporting hash…");
+      await fireBrokenInvoiceDeepLink({
+        posthog: posthogClient,
+        reportingAppUrl,
+        source: "reports_nav",
+      });
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!invoiceModalOpen) {
@@ -295,10 +345,12 @@ function App() {
                 {external ? (
                   <a
                     className="nav-link"
-                    href={`${reportingAppUrl.replace(/\/$/, "")}/#sales-summary`}
+                    href={reportingInvoicePerformanceUrl(reportingAppUrl)}
                     title="Opens the standalone reporting application"
                     aria-label="Reports, opens the standalone reporting application"
-                    onClick={() => captureProductEvent(posthogClient, "product_navigation", { source: "core", section: "Reports" })}
+                    onClick={(event) => {
+                      void openBrokenReports(event);
+                    }}
                   >
                     <Icon size={19} />
                     <span className="sidebar-label">{label}</span>
@@ -568,7 +620,13 @@ function App() {
                   <span><strong>Reconcile 14 transactions</strong><small>Westpac Business account</small></span>
                   <ArrowRight size={17} />
                 </button>
-                <a className="task-item" href={`${reportingAppUrl.replace(/\/$/, "")}/#sales-summary`}>
+                <a
+                  className="task-item"
+                  href={reportingInvoicePerformanceUrl(reportingAppUrl)}
+                  onClick={(event) => {
+                    void openBrokenReports(event);
+                  }}
+                >
                   <span className="task-icon"><FileBarChart2 size={17} /></span>
                   <span><strong>Review your sales summary</strong><small>Opens the reporting app (legacy deep link)</small></span>
                   <ArrowRight size={17} />
@@ -629,16 +687,72 @@ function App() {
       {invoiceModalOpen && (
         <div className="modal-layer" role="presentation">
           <button className="modal-backdrop" aria-label="Close create invoice dialog" onClick={closeInvoiceModal} />
-          <section className="invoice-modal" ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="create-dialog-title">
+          <section className="invoice-modal invoice-modal-wide" ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="create-dialog-title">
             <button className="modal-close icon-button" onClick={closeInvoiceModal} aria-label="Close dialog"><X size={20} /></button>
             <span className="modal-icon"><FileText size={22} /></span>
             <p className="eyebrow">{createDialog.eyebrow}</p>
             <h2 id="create-dialog-title">{createDialog.title}</h2>
-            <p>{createDialog.description}</p>
-            <div className="modal-actions">
-              <button className="secondary-button" type="button" onClick={closeInvoiceModal}>Not now</button>
-              <button className="primary-button" type="button" onClick={closeInvoiceModal}>Continue <ArrowRight size={17} /></button>
-            </div>
+            {activeSection === "Dashboard" || activeSection === "Sales" ? (
+              <>
+                <p>
+                  Fill in the draft below. Continue opens Reporting at{" "}
+                  <code>#{BROKEN_INVOICE_REPORT_HASH}</code> and signals the governed workflow.
+                </p>
+                <form
+                  className="invoice-form"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void submitInvoiceAndBreak();
+                  }}
+                >
+                  <label>
+                    Customer
+                    <select value={invoiceCustomer} onChange={(event) => setInvoiceCustomer(event.target.value)}>
+                      {invoiceCustomers.map((customer) => (
+                        <option key={customer} value={customer}>
+                          {customer}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Line item
+                    <input value={invoiceItem} onChange={(event) => setInvoiceItem(event.target.value)} />
+                  </label>
+                  <div className="invoice-form-row">
+                    <label>
+                      Amount (AUD)
+                      <input value={invoiceAmount} onChange={(event) => setInvoiceAmount(event.target.value)} inputMode="decimal" />
+                    </label>
+                    <label>
+                      Due date
+                      <input value={invoiceDue} onChange={(event) => setInvoiceDue(event.target.value)} />
+                    </label>
+                  </div>
+                  {signalStatus ? <p className="invoice-signal" role="status">{signalStatus}</p> : null}
+                  <div className="modal-actions">
+                    <button className="secondary-button" type="button" onClick={closeInvoiceModal}>
+                      Not now
+                    </button>
+                    <button className="primary-button" type="submit">
+                      Create &amp; view report <ArrowRight size={17} />
+                    </button>
+                  </div>
+                </form>
+              </>
+            ) : (
+              <>
+                <p>{createDialog.description}</p>
+                <div className="modal-actions">
+                  <button className="secondary-button" type="button" onClick={closeInvoiceModal}>
+                    Not now
+                  </button>
+                  <button className="primary-button" type="button" onClick={closeInvoiceModal}>
+                    Continue <ArrowRight size={17} />
+                  </button>
+                </div>
+              </>
+            )}
           </section>
         </div>
       )}
@@ -649,11 +763,13 @@ function App() {
 export default App;
 
 createRoot(document.getElementById("root")!).render(
-  posthogClient ? (
-    <PostHogProvider client={posthogClient}>
+  <Sentry.ErrorBoundary fallback={<p>Something went wrong loading Liquid.</p>}>
+    {posthogClient ? (
+      <PostHogProvider client={posthogClient}>
+        <App />
+      </PostHogProvider>
+    ) : (
       <App />
-    </PostHogProvider>
-  ) : (
-    <App />
-  ),
+    )}
+  </Sentry.ErrorBoundary>,
 );

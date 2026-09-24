@@ -14,6 +14,7 @@ const allowedEvents = new Set([
   "report_opened",
   "bff_status",
   "create_dialog_opened",
+  "invoice_deep_link_miss",
 ]);
 
 const allowedSections = new Set([
@@ -32,6 +33,7 @@ const allowedReports = new Set([
   "Cash flow",
   "Sales summary",
   "Revenue summary",
+  "Invoice performance",
   "Balance sheet",
   "Trial balance",
   "all",
@@ -101,9 +103,16 @@ export function createPosthogClient(app: "core" | "reporting"): PostHog | null {
   return posthog;
 }
 
+export type PostHogLike = PostHog;
+
 export function captureProductEvent(
   client: PostHog | null,
-  event: "product_navigation" | "report_opened" | "bff_status" | "create_dialog_opened",
+  event:
+    | "product_navigation"
+    | "report_opened"
+    | "bff_status"
+    | "create_dialog_opened"
+    | "invoice_deep_link_miss",
   properties?: Record<string, Property>,
 ): CaptureResult | undefined {
   return client?.capture(event, sanitiseProperties(properties));
