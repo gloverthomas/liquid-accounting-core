@@ -295,7 +295,7 @@ function App() {
                 {external ? (
                   <a
                     className="nav-link"
-                    href={`${reportingAppUrl.replace(/\/$/, "")}/#sales-summary`}
+                    href={`${reportingAppUrl.replace(/\/$/, "")}/#revenue-summary`}
                     title="Opens the standalone reporting application"
                     aria-label="Reports, opens the standalone reporting application"
                     onClick={() => captureProductEvent(posthogClient, "product_navigation", { source: "core", section: "Reports" })}
@@ -568,9 +568,9 @@ function App() {
                   <span><strong>Reconcile 14 transactions</strong><small>Westpac Business account</small></span>
                   <ArrowRight size={17} />
                 </button>
-                <a className="task-item" href={`${reportingAppUrl.replace(/\/$/, "")}/#sales-summary`}>
+                <a className="task-item" href={`${reportingAppUrl.replace(/\/$/, "")}/#revenue-summary`}>
                   <span className="task-icon"><FileBarChart2 size={17} /></span>
-                  <span><strong>Review your sales summary</strong><small>Opens the reporting app (legacy deep link)</small></span>
+                  <span><strong>Review Revenue summary</strong><small>Opens the reporting app</small></span>
                   <ArrowRight size={17} />
                 </a>
               </div>
