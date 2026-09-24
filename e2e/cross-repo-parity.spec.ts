@@ -20,15 +20,19 @@ test.describe("LIQ cross-repo parity seams", () => {
     await expect(page.getByRole("alert")).toContainText(/Report link out of date|sales-summary|Revenue summary/i);
   });
 
-  test("Core Help opens a menu; Reporting Help is broken (LIQ-16)", async ({ page }) => {
+  test("Help opens in both apps (LIQ-16)", async ({ page }) => {
+    const assertHelpMenu = async () => {
+      await page.getByRole("button", { name: "Help", exact: true }).click();
+      await expect(page.getByRole("menu", { name: "Help centre" })).toBeVisible();
+      await expect(page.getByRole("menuitem", { name: "Contact support" })).toBeVisible();
+    };
+
     await page.goto("/");
-    await page.getByRole("button", { name: "Help", exact: true }).click();
-    await expect(page.getByRole("menu", { name: "Help centre" })).toBeVisible();
-    await expect(page.getByRole("menuitem", { name: "Contact support" })).toBeVisible();
+    await assertHelpMenu();
 
     await page.goto(reportingUrl);
-    await page.getByRole("button", { name: "Help", exact: true }).click();
-    await expect(page.getByRole("alert")).toContainText(/Help centre|LIQ-16/i);
+    await expect(page.getByRole("alert")).toHaveCount(0);
+    await assertHelpMenu();
   });
 
   test("Core Reports deep-link to #revenue-summary", async ({ page }) => {
