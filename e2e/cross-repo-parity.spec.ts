@@ -38,7 +38,7 @@ test.describe("LIQ cross-repo parity seams", () => {
     await expect(page.getByRole("menu", { name: "Help centre" })).toBeVisible();
   });
 
-  test("Core Notifications open; Reporting Notifications are broken (LIQ-17)", async ({ page }) => {
+  test("Notifications open in both apps (LIQ-17 healed)", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("button", { name: "Notifications" }).click();
     await expect(page.getByRole("menu", { name: "Notifications" })).toBeVisible();
@@ -47,8 +47,10 @@ test.describe("LIQ cross-repo parity seams", () => {
 
     await page.goto(reportingUrl);
     await page.getByRole("button", { name: "Notifications" }).click();
-    await expect(page.getByRole("alert")).toContainText(/Notifications|temporarily unavailable/i);
-    await captureProof(page, "liq-17-reporting-notifications-miss.png");
+    await expect(page.getByRole("menu", { name: "Notifications" })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: /Invoice INV-1042 was paid/i })).toBeVisible();
+    await expect(page.getByRole("alert")).toHaveCount(0);
+    await captureProof(page, "liq-17-reporting-notifications-open.png");
   });
 
   test("Core Reports deep-link to #revenue-summary", async ({ page }) => {
