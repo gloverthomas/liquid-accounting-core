@@ -75,6 +75,28 @@ function sanitiseProperties(properties?: Record<string, Property>): Record<strin
   return Object.keys(sanitised).length > 0 ? sanitised : undefined;
 }
 
+/**
+ * PostHog requires these to ingest an event: `token` routes it to the project and
+ * `distinct_id` is the anonymous per-visit id (memory persistence, so it resets on
+ * every load). Without them every event is silently dropped at ingestion.
+ */
+const ingestionProperties = ["token", "distinct_id"] as const;
+
+/** Allowlist filter for every outgoing event; keeps only what ingestion strictly needs. */
+export function prepareEvent(event: CaptureResult | null, app: "core" | "reporting"): CaptureResult | null {
+  if (!event || !allowedEvents.has(event.event)) {
+    return null;
+  }
+  const original = (event.properties ?? {}) as Record<string, Property>;
+  const required = Object.fromEntries(
+    ingestionProperties.filter((key) => original[key] !== undefined).map((key) => [key, original[key]]),
+  );
+  return {
+    ...event,
+    properties: { ...sanitiseProperties(original), ...required, app },
+  };
+}
+
 export function createPosthogClient(app: "core" | "reporting"): PostHog | null {
   const token = import.meta.env.VITE_POSTHOG_PROJECT_TOKEN?.trim();
   const host = import.meta.env.VITE_POSTHOG_HOST?.trim();
@@ -93,17 +115,7 @@ export function createPosthogClient(app: "core" | "reporting"): PostHog | null {
     mask_all_element_attributes: true,
     persistence: "memory",
     property_denylist: ["$ip", "$email", "$name", "amount", "netProfit", "cashAtBank"],
-    before_send: (event) => {
-      if (!event || !allowedEvents.has(event.event)) {
-        return null;
-      }
-
-      event.properties = {
-        ...sanitiseProperties(event.properties as Record<string, Property> | undefined),
-        app,
-      };
-      return event;
-    },
+    before_send: (event) => prepareEvent(event, app),
   });
 
   return posthog;
