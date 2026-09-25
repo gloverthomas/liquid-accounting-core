@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { PostHogProvider } from "@posthog/react";
 import { WorkspacePage, type WorkspaceSection } from "./components/WorkspacePage";
+import { AiAssistant } from "./components/AiAssistant";
 import { captureProductEvent, createPosthogClient } from "./analytics";
 import {
   openReportingRevenueSummary,
@@ -153,6 +154,8 @@ function App() {
   const [invoiceDue, setInvoiceDue] = useState("7 Oct 2026");
   const [helpMenuOpen, setHelpMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const sidebarBeforeAssistantRef = useRef(false);
   const [invoiceSaved, setInvoiceSaved] = useState(false);
   const [chartsVisible, setChartsVisible] = useState(false);
   const sidebarRef = useRef<HTMLElement>(null);
@@ -277,6 +280,28 @@ function App() {
     setHelpMenuOpen(false);
     setNotificationsOpen((open) => !open);
     captureProductEvent(posthogClient, "product_navigation", { source: "core", section: "Notifications" });
+  }, []);
+
+  const toggleAssistant = useCallback(() => {
+    setAssistantOpen((open) => {
+      const next = !open;
+      if (next) {
+        sidebarBeforeAssistantRef.current = sidebarCollapsed;
+        setSidebarCollapsed(true);
+      } else {
+        setSidebarCollapsed(sidebarBeforeAssistantRef.current);
+      }
+      return next;
+    });
+    captureProductEvent(posthogClient, "product_navigation", {
+      source: "core",
+      section: "AI Assistant",
+    });
+  }, [sidebarCollapsed]);
+
+  const closeAssistant = useCallback(() => {
+    setAssistantOpen(false);
+    setSidebarCollapsed(sidebarBeforeAssistantRef.current);
   }, []);
 
   useEffect(() => {
@@ -473,6 +498,16 @@ function App() {
             <kbd>⌘ K</kbd>
           </div>
           <div className="topbar-actions">
+            <button
+              className="ai-assistant-launch"
+              type="button"
+              aria-pressed={assistantOpen}
+              aria-controls="liquid-ai-assistant"
+              onClick={toggleAssistant}
+            >
+              <Sparkles size={15} aria-hidden="true" />
+              <span>AI Assistant</span>
+            </button>
             <div className="notifications-menu" ref={notificationsRef}>
               <button
                 className="icon-button"
@@ -848,6 +883,14 @@ function App() {
           </section>
         </div>
       )}
+      <div id="liquid-ai-assistant">
+        <AiAssistant
+          open={assistantOpen}
+          onClose={closeAssistant}
+          contextLabel={activeSection === "Dashboard" ? "Dashboard" : activeSection}
+          userName="Jordan"
+        />
+      </div>
     </div>
   );
 }
