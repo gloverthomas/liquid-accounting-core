@@ -701,6 +701,7 @@ function App() {
           onClose={closeAssistant}
           contextLabel={activeSection === "Dashboard" ? "Dashboard" : activeSection}
           userName="Jordan"
+          onMessageOutcome={(outcome) => captureProductEvent(posthogClient, "assistant_message_sent", { source: "core", outcome })}
         />
       </div>
         </div>
