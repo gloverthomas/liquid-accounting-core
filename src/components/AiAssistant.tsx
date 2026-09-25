@@ -54,6 +54,8 @@ type Props = {
   /** When true, mimics a skills-ported shell with a missing BFF (LIQ-24 demo defect). */
   broken?: boolean;
   userName?: string;
+  /** Reports each message's outcome (answered/failed) for usage analytics; never the message text. */
+  onMessageOutcome?: (outcome: "answered" | "failed") => void;
 };
 
 function newId() {
@@ -201,6 +203,7 @@ export function AiAssistant({
   contextLabel = "Dashboard",
   broken = false,
   userName = "Jordan",
+  onMessageOutcome,
 }: Props) {
   const titleId = useId();
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -251,6 +254,7 @@ export function AiAssistant({
       setBusy(true);
 
       if (broken) {
+        onMessageOutcome?.("failed");
         await new Promise((r) => setTimeout(r, 450));
         setBusy(false);
         setError(
@@ -295,13 +299,15 @@ export function AiAssistant({
             relatedQuestions: normalizeRelated(data.relatedQuestions),
           },
         ]);
+        onMessageOutcome?.("answered");
       } catch (err) {
+        onMessageOutcome?.("failed");
         setError(err instanceof Error ? err.message : "assistant_failed");
       } finally {
         setBusy(false);
       }
     },
-    [busy, broken, context, messages],
+    [busy, broken, context, messages, onMessageOutcome],
   );
 
   if (!open) return null;

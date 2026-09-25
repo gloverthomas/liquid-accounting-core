@@ -165,4 +165,39 @@ describe("AiAssistant", () => {
     );
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  describe("usage outcomes (analytics, never message text)", () => {
+    const ask = async (props: Partial<Parameters<typeof AiAssistant>[0]> = {}) => {
+      const user = userEvent.setup();
+      const onMessageOutcome = vi.fn();
+      render(<AiAssistant open onClose={() => undefined} onMessageOutcome={onMessageOutcome} {...props} />);
+      await user.type(screen.getByLabelText(/Ask the AI assistant/i), "What's my gross profit margin?{Enter}");
+      return onMessageOutcome;
+    };
+
+    it("reports 'answered' after a successful reply", async () => {
+      vi.stubGlobal("fetch", mockChatOk());
+      const onMessageOutcome = await ask();
+      expect(await screen.findByText(/Income is up/)).toBeInTheDocument();
+      expect(onMessageOutcome).toHaveBeenCalledTimes(1);
+      expect(onMessageOutcome).toHaveBeenCalledWith("answered");
+    });
+
+    it("reports 'failed' when the BFF errors", async () => {
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({ error: "assistant_failed" }) }));
+      const onMessageOutcome = await ask();
+      await screen.findByRole("alert").catch(() => undefined);
+      await vi.waitFor(() => expect(onMessageOutcome).toHaveBeenCalledWith("failed"));
+      expect(onMessageOutcome).not.toHaveBeenCalledWith("answered");
+    });
+
+    it("reports 'failed' for the intentional broken rail, without calling the BFF", async () => {
+      const fetchMock = vi.fn();
+      vi.stubGlobal("fetch", fetchMock);
+      const onMessageOutcome = await ask({ broken: true });
+      await vi.waitFor(() => expect(onMessageOutcome).toHaveBeenCalledWith("failed"));
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
 });
+
