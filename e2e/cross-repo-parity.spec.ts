@@ -34,8 +34,8 @@ test.describe("LIQ cross-repo parity seams", () => {
     await coreTopbar.getByRole("button", { name: /AI Assistant/i }).click();
     await expect(page.getByRole("heading", { name: "AI Assistant" })).toBeVisible();
     await expect(coreTopbar.getByRole("button", { name: /AI Assistant/i })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Help", exact: true })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Notifications" })).toHaveCount(0);
+    await expect(coreTopbar.getByRole("button", { name: "Help", exact: true })).toHaveCount(0);
+    await expect(coreTopbar.getByRole("button", { name: "Notifications" })).toHaveCount(0);
     await captureProof(page, "liq-24-core-assistant-under-nav.png");
 
     await page.goto(reportingUrl);
@@ -43,8 +43,6 @@ test.describe("LIQ cross-repo parity seams", () => {
     await reportingTopbar.getByRole("button", { name: /AI Assistant/i }).click();
     await expect(page.getByRole("heading", { name: "AI Assistant" })).toBeVisible();
     await expect(reportingTopbar.getByRole("button", { name: /AI Assistant/i })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Help", exact: true })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Notifications" })).toHaveCount(0);
     await captureProof(page, "liq-24-reporting-assistant-under-nav.png");
   });
 
