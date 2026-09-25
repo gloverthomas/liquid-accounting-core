@@ -160,13 +160,11 @@ function AssistantMarkdown({ text }: { text: string }) {
 function CalculationAccordion({
   provider,
   rationale,
-  defaultOpen = false,
 }: {
   provider?: string;
   rationale: string;
-  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
+  const [open, setOpen] = useState(false);
   const panelId = useId();
 
   return (
@@ -182,10 +180,7 @@ function CalculationAccordion({
           <Sparkles size={14} aria-hidden="true" />
           How this was calculated
         </span>
-        <span className="ai-calc-toggle-meta">
-          {provider ? <span className="ai-provider">via {provider}</span> : null}
-          <ChevronDown size={16} className="ai-calc-chevron" aria-hidden="true" />
-        </span>
+        <ChevronDown size={16} className="ai-calc-chevron" aria-hidden="true" />
       </button>
       {open ? (
         <div id={panelId} className="ai-calc-panel">
@@ -193,6 +188,7 @@ function CalculationAccordion({
           <p className="ai-calc-complete">
             <Sparkles size={12} aria-hidden="true" /> Complete
           </p>
+          {provider ? <p className="ai-provider-foot">via {provider}</p> : null}
         </div>
       ) : null}
     </div>
@@ -412,11 +408,7 @@ export function AiAssistant({
                       </button>
                     </div>
                     {message.rationale ? (
-                      <CalculationAccordion
-                        provider={message.provider}
-                        rationale={message.rationale}
-                        defaultOpen={message.id === messages[messages.length - 1]?.id}
-                      />
+                      <CalculationAccordion provider={message.provider} rationale={message.rationale} />
                     ) : null}
                   </div>
                 )}

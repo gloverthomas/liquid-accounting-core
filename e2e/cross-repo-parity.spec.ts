@@ -28,27 +28,22 @@ test.describe("LIQ cross-repo parity seams", () => {
     await expect(page.getByRole("alert")).toContainText(/Report link out of date|sales-summary|Revenue summary/i);
   });
 
-  test("Help opens in both apps (LIQ-16 healed)", async ({ page }) => {
+  test("AI Assistant opens under the top nav in both apps (LIQ-24)", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("button", { name: "Help", exact: true }).click();
-    await expect(page.getByRole("menu", { name: "Help centre" })).toBeVisible();
+    const coreTopbar = page.locator("header.topbar");
+    await coreTopbar.getByRole("button", { name: /AI Assistant/i }).click();
+    await expect(page.getByRole("heading", { name: "AI Assistant" })).toBeVisible();
+    await expect(coreTopbar.getByRole("button", { name: /AI Assistant/i })).toBeVisible();
+    await expect(coreTopbar.getByRole("button", { name: "Help", exact: true })).toHaveCount(0);
+    await expect(coreTopbar.getByRole("button", { name: "Notifications" })).toHaveCount(0);
+    await captureProof(page, "liq-24-core-assistant-under-nav.png");
 
     await page.goto(reportingUrl);
-    await page.getByRole("button", { name: "Help", exact: true }).click();
-    await expect(page.getByRole("menu", { name: "Help centre" })).toBeVisible();
-  });
-
-  test("Core Notifications open; Reporting Notifications are broken (LIQ-17)", async ({ page }) => {
-    await page.goto("/");
-    await page.getByRole("button", { name: "Notifications" }).click();
-    await expect(page.getByRole("menu", { name: "Notifications" })).toBeVisible();
-    await expect(page.getByRole("menuitem", { name: /Invoice INV-1042 was paid/i })).toBeVisible();
-    await captureProof(page, "liq-17-core-notifications-open.png");
-
-    await page.goto(reportingUrl);
-    await page.getByRole("button", { name: "Notifications" }).click();
-    await expect(page.getByRole("alert")).toContainText(/Notifications|temporarily unavailable/i);
-    await captureProof(page, "liq-17-reporting-notifications-miss.png");
+    const reportingTopbar = page.locator("header.reporting-header");
+    await reportingTopbar.getByRole("button", { name: /AI Assistant/i }).click();
+    await expect(page.getByRole("heading", { name: "AI Assistant" })).toBeVisible();
+    await expect(reportingTopbar.getByRole("button", { name: /AI Assistant/i })).toBeVisible();
+    await captureProof(page, "liq-24-reporting-assistant-under-nav.png");
   });
 
   test("Core Reports deep-link to #revenue-summary", async ({ page }) => {
