@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   ArrowUp,
+  ChevronDown,
   Clock3,
   Copy,
+  CornerDownRight,
   ExternalLink,
   Plus,
   Sparkles,
@@ -11,6 +13,7 @@ import {
   ThumbsUp,
   X,
 } from "lucide-react";
+import liquidMark from "../assets/liquid-mark.png";
 
 export type AssistantTable = {
   headers: string[];
@@ -24,6 +27,8 @@ export type AssistantMessage = {
   table?: AssistantTable | null;
   cta?: { label: string; href: string } | null;
   provider?: string;
+  rationale?: string;
+  relatedQuestions?: string[];
 };
 
 type ChatResponse = {
@@ -31,10 +36,12 @@ type ChatResponse = {
   table?: AssistantTable | null;
   cta?: { label: string; href: string } | null;
   provider?: string;
+  rationale?: string;
+  relatedQuestions?: string[];
   error?: string;
 };
 
-const SUGGESTIONS = [
+const WELCOME_SUGGESTIONS = [
   "How does this quarter compare to last?",
   "What's my gross profit margin?",
   "What are my biggest income sources?",
@@ -76,6 +83,122 @@ function normalizeTable(table: unknown): AssistantTable | null {
   };
 }
 
+function normalizeRelated(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => String(item ?? "").trim())
+    .filter(Boolean)
+    .slice(0, 3);
+}
+
+/** Lightweight safe markdown: paragraphs, numbered/bulleted lists, **bold**. */
+function renderInline(text: string, keyPrefix: string): ReactNode[] {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, index) => {
+    if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
+      return <strong key={`${keyPrefix}-b-${index}`}>{part.slice(2, -2)}</strong>;
+    }
+    return part ? <span key={`${keyPrefix}-t-${index}`}>{part}</span> : null;
+  });
+}
+
+function AssistantMarkdown({ text }: { text: string }) {
+  const normalized = text
+    .replace(/\r\n/g, "\n")
+    .replace(/\s+(\d+)\.\s+/g, "\n$1. ")
+    .replace(/\s+[-•]\s+/g, "\n- ")
+    .trim();
+
+  const lines = normalized.split("\n").map((line) => line.trim()).filter(Boolean);
+  const blocks: ReactNode[] = [];
+  let listItems: { kind: "ol" | "ul"; items: string[] } | null = null;
+
+  const flushList = (key: string) => {
+    if (!listItems) return;
+    const Tag = listItems.kind === "ol" ? "ol" : "ul";
+    blocks.push(
+      <Tag key={key} className="ai-md-list">
+        {listItems.items.map((item, index) => (
+          <li key={`${key}-${index}`}>{renderInline(item, `${key}-${index}`)}</li>
+        ))}
+      </Tag>,
+    );
+    listItems = null;
+  };
+
+  lines.forEach((line, index) => {
+    const ordered = line.match(/^\d+\.\s+(.*)$/);
+    const bullet = line.match(/^[-•]\s+(.*)$/);
+    if (ordered) {
+      if (!listItems || listItems.kind !== "ol") {
+        flushList(`list-pre-${index}`);
+        listItems = { kind: "ol", items: [] };
+      }
+      listItems.items.push(ordered[1]);
+      return;
+    }
+    if (bullet) {
+      if (!listItems || listItems.kind !== "ul") {
+        flushList(`list-pre-${index}`);
+        listItems = { kind: "ul", items: [] };
+      }
+      listItems.items.push(bullet[1]);
+      return;
+    }
+    flushList(`list-pre-${index}`);
+    blocks.push(
+      <p key={`p-${index}`} className="ai-md-p">
+        {renderInline(line, `p-${index}`)}
+      </p>,
+    );
+  });
+  flushList("list-end");
+
+  return <div className="ai-md">{blocks}</div>;
+}
+
+function CalculationAccordion({
+  provider,
+  rationale,
+  defaultOpen = false,
+}: {
+  provider?: string;
+  rationale: string;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const panelId = useId();
+
+  return (
+    <div className={`ai-calc${open ? " is-open" : ""}`}>
+      <button
+        type="button"
+        className="ai-calc-toggle"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <span className="ai-calc-toggle-main">
+          <Sparkles size={14} aria-hidden="true" />
+          How this was calculated
+        </span>
+        <span className="ai-calc-toggle-meta">
+          {provider ? <span className="ai-provider">via {provider}</span> : null}
+          <ChevronDown size={16} className="ai-calc-chevron" aria-hidden="true" />
+        </span>
+      </button>
+      {open ? (
+        <div id={panelId} className="ai-calc-panel">
+          <p>{rationale}</p>
+          <p className="ai-calc-complete">
+            <Sparkles size={12} aria-hidden="true" /> Complete
+          </p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function AiAssistant({
   open,
   onClose,
@@ -109,6 +232,17 @@ export function AiAssistant({
   useEffect(() => {
     scrollerRef.current?.scrollTo({ top: scrollerRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, busy, error]);
+
+  const relatedQuestions = useMemo(() => {
+    if (messages.length === 0) return WELCOME_SUGGESTIONS;
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index];
+      if (message.role === "assistant" && message.relatedQuestions?.length) {
+        return message.relatedQuestions;
+      }
+    }
+    return WELCOME_SUGGESTIONS;
+  }, [messages]);
 
   const send = useCallback(
     async (text: string) => {
@@ -158,6 +292,11 @@ export function AiAssistant({
                 })()
               : null,
             provider: data.provider,
+            rationale:
+              typeof data.rationale === "string" && data.rationale.trim()
+                ? data.rationale.trim()
+                : "Answered from Liquid Coffee Co. demo books for this page context.",
+            relatedQuestions: normalizeRelated(data.relatedQuestions),
           },
         ]);
       } catch (err) {
@@ -182,7 +321,7 @@ export function AiAssistant({
     >
       <header className="ai-assistant-header">
         <div className="ai-assistant-title">
-          <Sparkles size={18} aria-hidden="true" />
+          <img className="ai-brand-mark" src={liquidMark} alt="" width={18} height={18} />
           <h2 id={titleId}>AI Assistant</h2>
           <span className="ai-assistant-beta">Beta</span>
         </div>
@@ -213,16 +352,9 @@ export function AiAssistant({
       <div className="ai-assistant-body" ref={scrollerRef}>
         {empty ? (
           <div className="ai-assistant-welcome">
-            <Sparkles size={36} aria-hidden="true" />
+            <img className="ai-welcome-mark" src={liquidMark} alt="" width={40} height={40} />
             <h3>Hello {userName}!</h3>
             <p>How can I help you today?</p>
-            <div className="ai-suggestions">
-              {SUGGESTIONS.map((suggestion) => (
-                <button key={suggestion} type="button" onClick={() => void send(suggestion)}>
-                  {suggestion}
-                </button>
-              ))}
-            </div>
           </div>
         ) : (
           <ul className="ai-message-list">
@@ -232,7 +364,7 @@ export function AiAssistant({
                   <div className="ai-bubble-user">{message.text}</div>
                 ) : (
                   <div className="ai-bubble-assistant">
-                    <p>{message.text}</p>
+                    <AssistantMarkdown text={message.text} />
                     {message.table ? (
                       <div className="ai-table-wrap">
                         <table>
@@ -279,11 +411,12 @@ export function AiAssistant({
                         <Copy size={14} />
                       </button>
                     </div>
-                    {message.provider ? (
-                      <button type="button" className="ai-calc-row" disabled>
-                        <Sparkles size={14} /> How this was calculated
-                        <span className="ai-provider">via {message.provider}</span>
-                      </button>
+                    {message.rationale ? (
+                      <CalculationAccordion
+                        provider={message.provider}
+                        rationale={message.rationale}
+                        defaultOpen={message.id === messages[messages.length - 1]?.id}
+                      />
                     ) : null}
                   </div>
                 )}
@@ -300,6 +433,16 @@ export function AiAssistant({
       </div>
 
       <footer className="ai-assistant-footer">
+        {!busy && relatedQuestions.length > 0 ? (
+          <div className="ai-related" aria-label={empty ? "Suggested questions" : "Related questions"}>
+            {relatedQuestions.map((question) => (
+              <button key={question} type="button" onClick={() => void send(question)}>
+                <CornerDownRight size={14} aria-hidden="true" />
+                <span>{question}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
         {context ? (
           <div className="ai-context">
             <span>Asking about: {context}</span>

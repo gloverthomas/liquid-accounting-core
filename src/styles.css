@@ -300,6 +300,13 @@ td strong { color: #374151; font-weight: 600; }
 .ai-assistant-title { display: flex; align-items: center; gap: 8px; color: #111827; min-width: 0; }
 .ai-assistant-title h2 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: -0.02em; }
 .ai-assistant-title svg { color: #ff292e; flex: 0 0 auto; }
+.ai-brand-mark {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex: 0 0 auto;
+}
 .ai-assistant-beta {
   display: inline-flex;
   align-items: center;
@@ -326,23 +333,23 @@ td strong { color: #374151; font-weight: 600; }
 .ai-icon-btn:hover:not(:disabled) { background: #f3f4f6; color: #111827; }
 .ai-icon-btn:disabled { opacity: 0.45; cursor: default; }
 .ai-assistant-body { flex: 1; min-height: 0; overflow: auto; padding: 18px 16px 12px; }
-.ai-assistant-welcome { display: grid; justify-items: center; text-align: center; gap: 8px; padding: 28px 8px 12px; }
-.ai-assistant-welcome svg { color: #ff292e; }
+.ai-assistant-welcome {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  text-align: center;
+  gap: 8px;
+  min-height: 100%;
+  padding: 24px 12px;
+}
+.ai-welcome-mark {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  object-fit: cover;
+}
 .ai-assistant-welcome h3 { margin: 8px 0 0; font-size: 1.45rem; letter-spacing: -0.03em; color: #111827; }
 .ai-assistant-welcome p { margin: 0; color: #6b7280; font-size: 0.95rem; }
-.ai-suggestions { display: grid; gap: 10px; width: 100%; margin-top: 22px; }
-.ai-suggestions button {
-  width: 100%;
-  border: 1px solid #ffc9c9;
-  border-radius: 999px;
-  background: #fff;
-  color: #b91c21;
-  padding: 12px 16px;
-  font-size: 13px;
-  font-weight: 600;
-  text-align: left;
-}
-.ai-suggestions button:hover { background: #fff5f5; border-color: #ff292e; }
 .ai-message-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
 .ai-bubble-user {
   margin-left: auto;
@@ -354,8 +361,16 @@ td strong { color: #374151; font-weight: 600; }
   font-size: 13px;
   line-height: 1.45;
 }
-.ai-bubble-assistant { display: grid; gap: 10px; color: #1f2937; font-size: 13px; line-height: 1.5; }
-.ai-bubble-assistant > p { margin: 0; }
+.ai-bubble-assistant { display: grid; gap: 10px; color: #1f2937; font-size: 13px; line-height: 1.55; }
+.ai-md { display: grid; gap: 8px; }
+.ai-md-p { margin: 0; }
+.ai-md-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 4px;
+}
+.ai-md-list li { padding-left: 2px; }
 .ai-table-wrap { overflow: auto; border: 1px solid #f0d0d0; border-radius: 10px; }
 .ai-table-wrap table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .ai-table-wrap th { background: #fff0f0; color: #7f1d1d; text-align: left; padding: 8px 10px; font-weight: 600; }
@@ -382,22 +397,53 @@ td strong { color: #374151; font-weight: 600; }
   color: #9ca3af;
 }
 .ai-feedback button:hover:not(:disabled) { background: #f3f4f6; color: #374151; }
-.ai-calc-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
+.ai-calc {
   border: 1px solid #eeeef0;
   border-radius: 10px;
   background: #fafafa;
+  overflow: hidden;
+}
+.ai-calc-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  border: 0;
+  background: transparent;
   color: #374151;
   padding: 10px 12px;
   font-size: 12px;
   font-weight: 600;
   text-align: left;
+  cursor: pointer;
 }
-.ai-calc-row svg { color: #ff292e; }
-.ai-provider { margin-left: auto; color: #9ca3af; font-weight: 500; }
+.ai-calc-toggle-main { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.ai-calc-toggle-main svg { color: #ff292e; flex: 0 0 auto; }
+.ai-calc-toggle-meta { display: inline-flex; align-items: center; gap: 8px; color: #9ca3af; flex: 0 0 auto; }
+.ai-provider { color: #9ca3af; font-weight: 500; font-size: 11px; white-space: nowrap; }
+.ai-calc-chevron { transition: transform 160ms ease; }
+.ai-calc.is-open .ai-calc-chevron { transform: rotate(180deg); }
+.ai-calc-panel {
+  border-top: 1px solid #eeeef0;
+  padding: 10px 12px 12px;
+  color: #4b5563;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+.ai-calc-panel p { margin: 0; border-left: 2px solid #e5e7eb; padding-left: 10px; }
+.ai-calc-complete {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px !important;
+  border-left: 0 !important;
+  padding-left: 0 !important;
+  color: #6b7280;
+  font-weight: 600;
+}
+.ai-calc-complete svg { color: #ff292e; }
 .ai-typing, .ai-error { margin: 10px 0 0; font-size: 12px; }
 .ai-typing { color: #6b7280; }
 .ai-error {
@@ -408,6 +454,29 @@ td strong { color: #374151; font-weight: 600; }
   padding: 10px 12px;
 }
 .ai-assistant-footer { border-top: 1px solid #eeeef0; padding: 10px 14px 14px; background: #fff; }
+.ai-related {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.ai-related button {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #374151;
+  padding: 6px 4px;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  line-height: 1.35;
+}
+.ai-related button svg { color: #9ca3af; margin-top: 2px; flex: 0 0 auto; }
+.ai-related button:hover { background: #f9fafb; color: #111827; }
+.ai-related button:hover svg { color: #ff292e; }
 .ai-context {
   display: inline-flex;
   align-items: center;
