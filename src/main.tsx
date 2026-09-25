@@ -2,12 +2,9 @@ import { type MouseEvent as ReactMouseEvent, useCallback, useEffect, useRef, use
 import { createRoot } from "react-dom/client";
 import {
   ArrowRight,
-  Bell,
   Building2,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
-  CircleHelp,
   CreditCard,
   FileBarChart2,
   FileText,
@@ -152,8 +149,6 @@ function App() {
   const [invoiceItem, setInvoiceItem] = useState("Wholesale coffee beans — 12kg");
   const [invoiceAmount, setInvoiceAmount] = useState("1,280.00");
   const [invoiceDue, setInvoiceDue] = useState("7 Oct 2026");
-  const [helpMenuOpen, setHelpMenuOpen] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
   const sidebarBeforeAssistantRef = useRef(false);
   const [invoiceSaved, setInvoiceSaved] = useState(false);
@@ -162,8 +157,6 @@ function App() {
   const collapseButtonRef = useRef<HTMLButtonElement>(null);
   const modalTriggerRef = useRef<HTMLElement>(null);
   const modalRef = useRef<HTMLElement>(null);
-  const helpMenuRef = useRef<HTMLDivElement>(null);
-  const notificationsRef = useRef<HTMLDivElement>(null);
   const pageHeadingRef = useRef<HTMLHeadingElement>(null);
   const createDialog = activeSection === "Purchases"
     ? { eyebrow: "New bill", title: "Create a bill", description: "This demo keeps bill creation local. The next step is to select a supplier and add bill details." }
@@ -270,18 +263,6 @@ function App() {
     [],
   );
 
-  const toggleHelpMenu = useCallback(() => {
-    setNotificationsOpen(false);
-    setHelpMenuOpen((open) => !open);
-    captureProductEvent(posthogClient, "product_navigation", { source: "core", section: "Dashboard" });
-  }, []);
-
-  const toggleNotifications = useCallback(() => {
-    setHelpMenuOpen(false);
-    setNotificationsOpen((open) => !open);
-    captureProductEvent(posthogClient, "product_navigation", { source: "core", section: "Notifications" });
-  }, []);
-
   const toggleAssistant = useCallback(() => {
     setAssistantOpen((open) => {
       const next = !open;
@@ -303,31 +284,6 @@ function App() {
     setAssistantOpen(false);
     setSidebarCollapsed(sidebarBeforeAssistantRef.current);
   }, []);
-
-  useEffect(() => {
-    if (!helpMenuOpen && !notificationsOpen) return;
-    const onPointerDown = (event: PointerEvent) => {
-      const target = event.target as Node;
-      if (helpMenuOpen && !helpMenuRef.current?.contains(target)) {
-        setHelpMenuOpen(false);
-      }
-      if (notificationsOpen && !notificationsRef.current?.contains(target)) {
-        setNotificationsOpen(false);
-      }
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setHelpMenuOpen(false);
-        setNotificationsOpen(false);
-      }
-    };
-    window.addEventListener("pointerdown", onPointerDown);
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("pointerdown", onPointerDown);
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [helpMenuOpen, notificationsOpen]);
 
   useEffect(() => {
     if (!invoiceModalOpen) {
@@ -469,17 +425,6 @@ function App() {
             <Settings size={19} />
             <span className="sidebar-label">Settings</span>
           </button>
-          <button
-            className="nav-link"
-            type="button"
-            title="Help centre"
-            aria-label="Help centre"
-            aria-expanded={helpMenuOpen}
-            onClick={toggleHelpMenu}
-          >
-            <CircleHelp size={19} />
-            <span className="sidebar-label">Help centre</span>
-          </button>
           <div className="profile-card" title="Jordan Green" aria-label="Jordan Green, Owner">
             <span className="profile-avatar" aria-hidden="true">JG</span>
             <span className="sidebar-label">
@@ -490,7 +435,7 @@ function App() {
         </div>
       </aside>
 
-      <main className="main-content">
+      <div className="workspace">
         <header className="topbar">
           <div className="search-box">
             <Search size={18} />
@@ -508,66 +453,6 @@ function App() {
               <Sparkles size={15} aria-hidden="true" />
               <span>AI Assistant</span>
             </button>
-            <div className="notifications-menu" ref={notificationsRef}>
-              <button
-                className="icon-button"
-                type="button"
-                aria-label="Notifications"
-                aria-expanded={notificationsOpen}
-                aria-haspopup="menu"
-                onClick={toggleNotifications}
-              >
-                <Bell size={18} />
-                <span className="notification-dot" />
-              </button>
-              {notificationsOpen ? (
-                <div className="help-popover notifications-popover" role="menu" aria-label="Notifications">
-                  <p className="help-popover-title">Notifications</p>
-                  <button type="button" role="menuitem" onClick={() => setNotificationsOpen(false)}>
-                    Invoice INV-1042 was paid
-                  </button>
-                  <button type="button" role="menuitem" onClick={() => setNotificationsOpen(false)}>
-                    Bank feed needs review
-                  </button>
-                  <button type="button" role="menuitem" onClick={() => setNotificationsOpen(false)}>
-                    Payroll run is ready
-                  </button>
-                </div>
-              ) : null}
-            </div>
-            <div className="help-menu" ref={helpMenuRef}>
-              <button
-                className="help-button"
-                type="button"
-                aria-expanded={helpMenuOpen}
-                aria-haspopup="menu"
-                onClick={toggleHelpMenu}
-              >
-                <CircleHelp size={17} />
-                <span>Help</span>
-              </button>
-              {helpMenuOpen ? (
-                <div className="help-popover" role="menu" aria-label="Help centre">
-                  <p className="help-popover-title">Help centre</p>
-                  <button type="button" role="menuitem" onClick={() => setHelpMenuOpen(false)}>
-                    Keyboard shortcuts
-                  </button>
-                  <button type="button" role="menuitem" onClick={() => setHelpMenuOpen(false)}>
-                    Contact support
-                  </button>
-                  <button type="button" role="menuitem" onClick={() => setHelpMenuOpen(false)}>
-                    What’s new in Liquid
-                  </button>
-                  <a
-                    role="menuitem"
-                    href="https://liquid-accounting.world"
-                    onClick={() => setHelpMenuOpen(false)}
-                  >
-                    Product docs
-                  </a>
-                </div>
-              ) : null}
-            </div>
             <button
               className="business-switcher"
               type="button"
@@ -575,15 +460,12 @@ function App() {
               title={organisation.name}
             >
               <span className="business-avatar" aria-hidden="true">LC</span>
-              <span className="org-copy">
-                <strong>{organisation.name}</strong>
-                <small>{organisation.role} · {bffAvailable ? "Core BFF" : "Fixture fallback"}</small>
-              </span>
-              <ChevronDown size={15} aria-hidden="true" />
             </button>
           </div>
         </header>
 
+        <div className="workspace-body">
+      <main className="main-content">
         <div className="page">
           {activeSection === "Dashboard" ? (
             <>
@@ -813,6 +695,16 @@ function App() {
           )}
         </div>
       </main>
+      <div id="liquid-ai-assistant">
+        <AiAssistant
+          open={assistantOpen}
+          onClose={closeAssistant}
+          contextLabel={activeSection === "Dashboard" ? "Dashboard" : activeSection}
+          userName="Jordan"
+        />
+      </div>
+        </div>
+      </div>
 
       {invoiceModalOpen && (
         <div className="modal-layer" role="presentation">
@@ -883,14 +775,6 @@ function App() {
           </section>
         </div>
       )}
-      <div id="liquid-ai-assistant">
-        <AiAssistant
-          open={assistantOpen}
-          onClose={closeAssistant}
-          contextLabel={activeSection === "Dashboard" ? "Dashboard" : activeSection}
-          userName="Jordan"
-        />
-      </div>
     </div>
   );
 }
