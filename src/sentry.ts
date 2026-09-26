@@ -97,28 +97,4 @@ export function reportLegacyDeepLink(hash: string): void {
   });
 }
 
-/** LIQ-15: Core invents #invoice-performance — do not include customer/amount PII. */
-export function reportBrokenInvoiceDeepLink(args: {
-  hash: string;
-  source: "create_invoice" | "reports_nav";
-  customer?: string;
-  amount?: string;
-}): void {
-  Sentry.captureMessage("Core deep-link to missing Reporting hash", {
-    level: "error",
-    tags: {
-      app: "core",
-      kind: "deep-link",
-      seam: "LIQ-15",
-      source: args.source,
-    },
-    extra: {
-      hash: args.hash,
-      // Intentionally omit customer/amount — scrubbed even if callers pass them.
-      hasCustomer: Boolean(args.customer),
-      hasAmount: Boolean(args.amount),
-    },
-  });
-}
-
 export { Sentry };

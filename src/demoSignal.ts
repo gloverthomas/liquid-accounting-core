@@ -1,15 +1,11 @@
 import { captureProductEvent, type PostHogLike } from "./analytics";
 
-/** Fixed report target — no longer the demo hero. */
+/** Where Reports and Create Invoice take you in the Reporting app. */
 export const CANONICAL_REPORT_HASH = "revenue-summary";
 
 export function reportingRevenueSummaryUrl(reportingAppUrl: string): string {
   return `${reportingAppUrl.replace(/\/$/, "")}/#${CANONICAL_REPORT_HASH}`;
 }
-
-/** @deprecated kept for older call sites during LIQ-15 teardown */
-export const BROKEN_INVOICE_REPORT_HASH = CANONICAL_REPORT_HASH;
-export const reportingInvoicePerformanceUrl = reportingRevenueSummaryUrl;
 
 export async function openReportingRevenueSummary(args: {
   posthog: PostHogLike | null;
@@ -24,6 +20,3 @@ export async function openReportingRevenueSummary(args: {
   });
   window.location.assign(target);
 }
-
-/** @deprecated */
-export const fireBrokenInvoiceDeepLink = openReportingRevenueSummary;

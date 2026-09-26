@@ -23,9 +23,27 @@ test.describe("LIQ cross-repo parity seams", () => {
     ).toBeVisible();
   });
 
-  test("Core deep-links to legacy #sales-summary; Reporting flags the miss (LIQ-9)", async ({ page }) => {
-    await page.goto(`${reportingUrl}/#sales-summary`);
-    await expect(page.getByRole("alert")).toContainText(/Report link out of date|sales-summary|Revenue summary/i);
+  for (const legacy of ["sales-summary", "invoice-performance"]) {
+    test(`Old #${legacy} links open Revenue summary in Reporting (LIQ-9 / LIQ-15)`, async ({ page }) => {
+      await page.goto(`${reportingUrl}/#${legacy}`);
+      await expect(page.getByRole("heading", { name: "Revenue summary" })).toBeVisible();
+      await expect(page.getByRole("alert")).toHaveCount(0);
+      await expect(page).toHaveURL(/#revenue-summary$/);
+    });
+  }
+
+  test("Status pills look the same in both apps (LIQ-7)", async ({ page }) => {
+    const pillStyle = (locator: import("@playwright/test").Locator) =>
+      locator.evaluate((el) => {
+        const s = getComputedStyle(el);
+        return { radius: s.borderTopLeftRadius, size: s.fontSize, weight: s.fontWeight, transform: s.textTransform, color: s.color, background: s.backgroundColor };
+      });
+    await page.goto("/");
+    const core = await pillStyle(page.locator("span.status.status-overdue").first());
+    await page.goto(`${reportingUrl}/#revenue-summary`);
+    const reporting = await pillStyle(page.locator("span.status.status-overdue").first());
+    expect(reporting).toEqual(core);
+    await captureProof(page, "liq-7-reporting-status-pills.png");
   });
 
   test("AI Assistant opens under the top nav in both apps (LIQ-24)", async ({ page }) => {
