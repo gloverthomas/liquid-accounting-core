@@ -30,7 +30,7 @@ import { AiAssistant } from "./components/AiAssistant";
 import { captureProductEvent, createPosthogClient } from "./analytics";
 import {
   openReportingRevenueSummary,
-  reportingInvoicePerformanceUrl,
+  reportingRevenueSummaryUrl,
 } from "./demoSignal";
 import { initSentry, reportCrossAppUrlDrift, Sentry } from "./sentry";
 import liquidLogo from "./media/liquid-logo.png";
@@ -362,7 +362,7 @@ function App() {
                 {external ? (
                   <a
                     className="nav-link"
-                    href={reportingInvoicePerformanceUrl(reportingAppUrl)}
+                    href={reportingRevenueSummaryUrl(reportingAppUrl)}
                     title="Opens the standalone reporting application"
                     aria-label="Reports, opens the standalone reporting application"
                     onClick={(event) => {
@@ -634,13 +634,13 @@ function App() {
                 </button>
                 <a
                   className="task-item"
-                  href={reportingInvoicePerformanceUrl(reportingAppUrl)}
+                  href={reportingRevenueSummaryUrl(reportingAppUrl)}
                   onClick={(event) => {
                     void openReports(event);
                   }}
                 >
                   <span className="task-icon"><FileBarChart2 size={17} /></span>
-                  <span><strong>Review your sales summary</strong><small>Opens the reporting app (legacy deep link)</small></span>
+                  <span><strong>Review your revenue summary</strong><small>Opens Revenue summary in Reports</small></span>
                   <ArrowRight size={17} />
                 </a>
               </div>
