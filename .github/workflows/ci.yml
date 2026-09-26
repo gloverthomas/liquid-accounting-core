@@ -148,6 +148,7 @@ jobs:
           set -euo pipefail
           shopt -s nullglob
           files=(e2e/proof/*.png)
+          issue_id="$(printf '%s\n%s' "${{ github.event.pull_request.title }}" "${{ github.head_ref }}" | grep -oiE 'LIQ-[0-9]+' | head -1 | tr '[:upper:]' '[:lower:]')"
           BASE="https://raw.githubusercontent.com/${{ github.repository }}/${{ steps.proof.outputs.sha }}"
           BODY="## Visual proof (Playwright)
 
@@ -158,6 +159,9 @@ jobs:
           "
           for f in "${files[@]}"; do
             name="$(basename "$f")"
+            if [ -z "$issue_id" ] || [[ "${name,,}" != *"$issue_id"* ]]; then
+              continue
+            fi
             BODY="${BODY}
           ### ${name}
           ![${name}](${BASE}/${name})
