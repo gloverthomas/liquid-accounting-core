@@ -111,7 +111,13 @@ export async function handleProductSignal(payload) {
   };
 
   const forwarded = await forwardWorkflow(body);
-  if (forwarded && forwarded.status >= 200 && forwarded.status < 300) {
+  const workflowIssueId = forwarded?.json?.issue?.identifier;
+  if (
+    forwarded &&
+    forwarded.status >= 200 &&
+    forwarded.status < 300 &&
+    workflowIssueId
+  ) {
     return { ok: true, via: "workflow", ...forwarded.json };
   }
 
