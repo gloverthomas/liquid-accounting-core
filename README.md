@@ -59,3 +59,7 @@ The app uses the supplied Space Grotesk family when it is installed on the prese
 ## Intentional migration seam
 
 `Reports` is a separate navigation boundary. The reporting app will initially ship a duplicate shell and an older component implementation. The later Cursor SDK workflow can analyse both repositories, plan a safe migration, and move the reporting routes into this canonical application.
+
+## Why it's built this way
+
+Decision records: [`docs/decisions/`](docs/decisions/README.md).
