@@ -114,7 +114,7 @@ jobs:
           path: core/e2e/proof/*.png
           if-no-files-found: warn
       - name: Publish proof on PR branch for inline viewing
-        if: github.event_name == 'pull_request' && always()
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         working-directory: core
         env:
           GH_TOKEN: ${{ github.token }}
