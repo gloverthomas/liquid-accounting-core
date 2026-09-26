@@ -1,8 +1,8 @@
 # PR visual proof
 
-Playwright CI copies screenshots from `e2e/proof/` into this folder on **pull requests** so they render inline in GitHub (PR comment + Files tab) without downloading the Actions artifact zip.
+Put manual or agent-captured screenshots here and embed them in the PR body.
 
-Do not edit CI-generated PNGs by hand; re-run CI or update the Playwright proof specs instead.
+Playwright CI does **not** commit here. On pull requests it force-pushes `e2e/proof/*.png` to branch `pr-proof/pr-<number>` and posts a PR comment with the images inline, so the PR head (and its required checks) never moves.
 
 ## Linear
 

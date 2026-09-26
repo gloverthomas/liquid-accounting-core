@@ -113,8 +113,10 @@ jobs:
           name: help-parity-proof
           path: core/e2e/proof/*.png
           if-no-files-found: warn
-      - name: Publish proof on PR branch for inline viewing
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      # Proof images live on a side branch so the PR head (and its required checks) never moves.
+      - name: Publish proof images to pr-proof branch
+        id: proof
+        if: github.event_name == 'pull_request' && always()
         working-directory: core
         env:
           GH_TOKEN: ${{ github.token }}
@@ -126,51 +128,40 @@ jobs:
             echo "No proof PNGs to publish."
             exit 0
           fi
-          mkdir -p docs/pr-proof
-          for f in "${files[@]}"; do
-            cp "$f" "docs/pr-proof/$(basename "$f")"
-          done
+          branch="pr-proof/pr-${{ github.event.pull_request.number }}"
+          dir="$(mktemp -d)"
+          cp "${files[@]}" "$dir/"
+          cd "$dir"
+          git init -q -b "$branch"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/pr-proof/
-          git diff --staged --quiet && echo "Proof unchanged on branch." && exit 0
-          git commit -m "chore(ci): visual proof screenshots"
-          git pull origin "${{ github.head_ref }}" --rebase --autostash || git pull origin "${{ github.head_ref }}" --ff-only
-          git push origin "HEAD:${{ github.head_ref }}"
+          git add .
+          git commit -q -m "chore(ci): visual proof for PR #${{ github.event.pull_request.number }} (run ${{ github.run_id }})"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" "HEAD:refs/heads/${branch}"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Comment proof on PR (inline images)
-        if: github.event_name == 'pull_request' && always()
+        if: github.event_name == 'pull_request' && always() && steps.proof.outputs.sha != ''
         working-directory: core
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           shopt -s nullglob
-          git pull origin "${{ github.head_ref }}" --ff-only 2>/dev/null || true
-          files=(docs/pr-proof/*.png)
-          if [ ${#files[@]} -eq 0 ]; then
-            files=(e2e/proof/*.png)
-          fi
-          if [ ${#files[@]} -eq 0 ]; then
-            echo "No proof files for PR comment."
-            exit 0
-          fi
-          SHA="$(git rev-parse HEAD)"
-          BASE="https://raw.githubusercontent.com/${{ github.repository }}/${SHA}/docs/pr-proof"
+          files=(e2e/proof/*.png)
+          BASE="https://raw.githubusercontent.com/${{ github.repository }}/${{ steps.proof.outputs.sha }}"
           BODY="## Visual proof (Playwright)
 
           CI run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-          Screenshots below are on this PR branch (\`docs/pr-proof/\`). Open the linked GitHub PR from Linear to review without downloading the **help-parity-proof** artifact zip.
+          Screenshots below are published to branch \`pr-proof/pr-${{ github.event.pull_request.number }}\` so you can review without downloading the **help-parity-proof** artifact zip.
 
           "
           for f in "${files[@]}"; do
             name="$(basename "$f")"
-            if [ -f "docs/pr-proof/$name" ]; then
-              BODY="${BODY}
+            BODY="${BODY}
           ### ${name}
           ![${name}](${BASE}/${name})
           "
-            fi
           done
           BODY="${BODY}
           <details>
@@ -187,6 +178,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-          PROOF_DIR: docs/pr-proof
+          PROOF_DIR: e2e/proof
           JOB_LABEL: parity-proof
         run: node scripts/post-linear-visual-proof.mjs

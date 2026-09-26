@@ -9,7 +9,7 @@ import { execSync } from "node:child_process";
 
 const LINEAR_API_KEY = process.env.LINEAR_API_KEY?.trim();
 const PR_NUMBER = process.env.PR_NUMBER?.trim();
-const PROOF_DIR = process.env.PROOF_DIR?.trim() || "docs/pr-proof";
+const PROOF_DIR = process.env.PROOF_DIR?.trim() || "e2e/proof";
 const JOB_LABEL = process.env.JOB_LABEL?.trim() || "parity-proof";
 const RUN_URL =
   process.env.CI_RUN_URL?.trim() ||
@@ -178,7 +178,7 @@ async function main() {
       `- **PR:** ${pr.url}`,
       RUN_URL ? `- **CI run:** ${RUN_URL}` : "",
       "",
-      "Screenshots from Playwright (also on the GitHub PR comment and in `docs/pr-proof/`).",
+      "Screenshots from Playwright (also inline on the GitHub PR comment).",
       "",
     ];
     for (const { name, assetUrl } of uploaded) {
