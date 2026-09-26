@@ -2,9 +2,21 @@
  * Vercel serverless — POST /api/v1/assistant/chat
  * Uses XAI_API_KEY when set; otherwise demo fixtures.
  * Public endpoint (the demo app has no sign-in), so server/assistantGuard.mjs
- * limits it to same-site browser requests, rate-limits per IP and caps Grok spend.
+ * limits it to same-site browser requests, rate-limits per IP and caps Grok spend,
+ * and Vercel BotID must verify a real browser (bots get 403).
  */
+import { checkBotId } from "botid/server";
 import { checkRequest, takeGrokBudget } from "../../../server/assistantGuard.mjs";
+
+/** "human" | "bot" | "unknown" (BotID unavailable). Headers can be forged, BotID can't. */
+async function botVerdict(headers) {
+  try {
+    const result = await checkBotId({ advancedOptions: { headers } });
+    return result.isBot ? "bot" : "human";
+  } catch {
+    return "unknown";
+  }
+}
 
 const xaiApiKey = (process.env.XAI_API_KEY ?? "").trim();
 const xaiModel = (process.env.XAI_MODEL ?? "").trim() || "grok-4-fast-non-reasoning";
@@ -204,6 +216,11 @@ export default async function handler(req, res) {
     res.status(refused.status).json({ error: refused.error });
     return;
   }
+  const verdict = await botVerdict(req.headers);
+  if (verdict === "bot") {
+    res.status(403).json({ error: "forbidden" });
+    return;
+  }
 
   try {
     const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body ?? {};
@@ -219,7 +236,8 @@ export default async function handler(req, res) {
     }
 
     let payload;
-    if (xaiApiKey && takeGrokBudget()) {
+    // If BotID was unavailable, answer from fixtures: never spend the key unverified.
+    if (xaiApiKey && verdict === "human" && takeGrokBudget()) {
       try {
         payload = await callGrok({
           message,

@@ -14,11 +14,11 @@
     "test:e2e": "playwright test",
     "test:e2e:parity": "playwright test e2e/cross-repo-parity.spec.ts"
   },
-
   "dependencies": {
     "@posthog/react": "^1.11.1",
     "@sentry/react": "^10.75.3",
     "@vitejs/plugin-react": "^5.0.0",
+    "botid": "^1.5.11",
     "lucide-react": "^0.468.0",
     "posthog-js": "^1.434.12",
     "react": "^19.0.0",
