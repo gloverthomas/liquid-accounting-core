@@ -11,16 +11,16 @@ async function captureProof(page: import("@playwright/test").Page, name: string)
 }
 
 test.describe("LIQ cross-repo parity seams", () => {
-  test("Core shell uses Create; Reporting still shows New (LIQ-8)", async ({ page }) => {
+  test("Both apps label the create entry 'Create' (LIQ-8)", async ({ page }) => {
     await page.goto("/");
     await expect(
       page.getByRole("navigation", { name: "Primary navigation" }).getByRole("button", { name: "Create" }),
     ).toBeVisible();
 
     await page.goto(reportingUrl);
-    await expect(
-      page.getByRole("navigation", { name: "Primary navigation" }).locator('a[title="New"]'),
-    ).toBeVisible();
+    const reportingNav = page.getByRole("navigation", { name: "Primary navigation" });
+    await expect(reportingNav.locator('a[title="Create"]')).toBeVisible();
+    await expect(reportingNav.locator('a[title="New"]')).toHaveCount(0);
   });
 
   for (const legacy of ["sales-summary", "invoice-performance"]) {
@@ -76,11 +76,11 @@ test.describe("LIQ cross-repo parity seams", () => {
     await expect(page.getByRole("alert")).toHaveCount(0);
   });
 
-  test("Collapse control accessible names differ across apps (LIQ-5)", async ({ page }) => {
-    await page.goto("/");
-    await expect(page.getByRole("button", { name: /Collapse navigation|Expand navigation/ })).toBeVisible();
-
-    await page.goto(reportingUrl);
-    await expect(page.getByRole("button", { name: "Toggle menu" })).toBeVisible();
+  test("Collapse control has the same accessible names in both apps (LIQ-5)", async ({ page }) => {
+    for (const url of ["/", reportingUrl]) {
+      await page.goto(url);
+      await expect(page.getByRole("button", { name: "Toggle menu" })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: /^(Collapse|Expand) navigation$/ })).toBeVisible();
+    }
   });
 });
