@@ -1,7 +1,11 @@
 /**
  * Vercel serverless — POST /api/v1/assistant/chat
  * Uses XAI_API_KEY when set; otherwise demo fixtures.
+ * Public endpoint (the demo app has no sign-in), so server/assistantGuard.mjs
+ * limits it to same-site browser requests, rate-limits per IP and caps Grok spend.
  */
+import { checkRequest, takeGrokBudget } from "../../../server/assistantGuard.mjs";
+
 const xaiApiKey = (process.env.XAI_API_KEY ?? "").trim();
 const xaiModel = (process.env.XAI_MODEL ?? "").trim() || "grok-4-fast-non-reasoning";
 
@@ -173,7 +177,9 @@ Respond with ONLY valid JSON (no markdown fences) using this shape:
   let content;
   try {
     content = await complete(true);
-  } catch {
+  } catch (error) {
+    // Retry without JSON mode only when the model rejects it; timeouts/5xx don't double the spend.
+    if (!(error instanceof Error && /^xai_(400|422)$/.test(error.message))) throw error;
     content = await complete(false);
   }
   const parsed = parseGrokPayload(content, message);
@@ -188,12 +194,14 @@ Respond with ONLY valid JSON (no markdown fences) using this shape:
 
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
-  if (req.method === "OPTIONS") {
-    res.status(204).end();
-    return;
-  }
   if (req.method !== "POST") {
     res.status(405).json({ error: "method_not_allowed" });
+    return;
+  }
+  const raw = typeof req.body === "string" ? req.body : JSON.stringify(req.body ?? {});
+  const refused = checkRequest({ headers: req.headers, bodyBytes: Buffer.byteLength(raw) });
+  if (refused) {
+    res.status(refused.status).json({ error: refused.error });
     return;
   }
 
@@ -205,8 +213,13 @@ export default async function handler(req, res) {
       return;
     }
 
+    if (message.length > 2000) {
+      res.status(400).json({ error: "message_too_long" });
+      return;
+    }
+
     let payload;
-    if (xaiApiKey) {
+    if (xaiApiKey && takeGrokBudget()) {
       try {
         payload = await callGrok({
           message,
