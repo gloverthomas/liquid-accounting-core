@@ -137,6 +137,7 @@ jobs:
           git add docs/pr-proof/
           git diff --staged --quiet && echo "Proof unchanged on branch." && exit 0
           git commit -m "chore(ci): visual proof screenshots [skip ci]"
+          git pull origin "${{ github.head_ref }}" --rebase --autostash || git pull origin "${{ github.head_ref }}" --ff-only
           git push origin "HEAD:${{ github.head_ref }}"
       - name: Comment proof on PR (inline images)
         if: github.event_name == 'pull_request' && always()
