@@ -5,7 +5,7 @@
  * Requires LINEAR_API_KEY repo secret and pull_request event context.
  */
 import { readFile, readdir, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { execSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 
@@ -46,11 +46,28 @@ export function issueIdForProof({ title, headRefName, body }) {
   return null;
 }
 
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Whole token: LIQ-24 matches liq-24-open.png, not liq-241 or liq-2. LIQ-1 does not match liq-17. */
+export function filenameHasIssueId(name, issueId) {
+  if (!name || !issueId) return false;
+  const re = new RegExp(`(?:^|[^a-z0-9])${escapeRegExp(issueId)}(?![0-9])`, "i");
+  return re.test(name);
+}
+
 /** Only screenshots named for this ticket. Canned shots from other issues stay out. */
 export function pngsForIssue(pngs, issueId) {
   if (!issueId) return [];
-  const needle = issueId.toLowerCase();
-  return pngs.filter((file) => file.name.toLowerCase().includes(needle));
+  return pngs.filter((file) => filenameHasIssueId(file.name, issueId));
+}
+
+/** Paths whose basename contains the ticket id from title, then branch, then body. */
+export function matchingProofPaths(paths, source) {
+  const issueId = issueIdForProof(source);
+  const files = paths.filter(Boolean).map((path) => ({ path, name: basename(path) }));
+  return pngsForIssue(files, issueId).map((file) => file.path);
 }
 
 async function listPngs(dir) {
@@ -204,9 +221,29 @@ async function main() {
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main().catch((err) => {
-    console.error("Linear visual proof upload failed (non-fatal for CI):", err);
-    process.exit(0);
+function listMatchingCli(argv) {
+  const flag = argv.indexOf("--list-matching");
+  const paths = argv.slice(flag + 1).filter((arg) => arg && !arg.startsWith("--"));
+  const matched = matchingProofPaths(paths, {
+    title: process.env.PR_TITLE ?? "",
+    headRefName: process.env.PR_HEAD ?? "",
+    body: process.env.PR_BODY ?? "",
   });
+  for (const path of matched) console.log(path);
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  if (process.argv.includes("--list-matching")) {
+    try {
+      listMatchingCli(process.argv);
+    } catch (err) {
+      console.error(err);
+      process.exit(1);
+    }
+  } else {
+    main().catch((err) => {
+      console.error("Linear visual proof upload failed (non-fatal for CI):", err);
+      process.exit(0);
+    });
+  }
 }

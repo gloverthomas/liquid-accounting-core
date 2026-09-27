@@ -120,6 +120,9 @@ jobs:
         working-directory: core
         env:
           GH_TOKEN: ${{ github.token }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_HEAD: ${{ github.head_ref }}
+          PR_BODY: ${{ github.event.pull_request.body }}
         run: |
           set -euo pipefail
           shopt -s nullglob
@@ -128,9 +131,14 @@ jobs:
             echo "No proof PNGs to publish."
             exit 0
           fi
+          mapfile -t matched < <(node scripts/post-linear-visual-proof.mjs --list-matching "${files[@]}")
+          if [ ${#matched[@]} -eq 0 ]; then
+            echo "No proof PNGs whose filename contains this ticket id."
+            exit 0
+          fi
           branch="pr-proof/pr-${{ github.event.pull_request.number }}"
           dir="$(mktemp -d)"
-          cp "${files[@]}" "$dir/"
+          cp "${matched[@]}" "$dir/"
           cd "$dir"
           git init -q -b "$branch"
           git config user.name "github-actions[bot]"
@@ -140,16 +148,23 @@ jobs:
           git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" "HEAD:refs/heads/${branch}"
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Comment proof on PR (inline images)
-        if: github.event_name == 'pull_request' && always() && steps.proof.outputs.sha != ''
+        if: github.event_name == 'pull_request' && always()
         working-directory: core
         env:
           GH_TOKEN: ${{ github.token }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_HEAD: ${{ github.head_ref }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PROOF_SHA: ${{ steps.proof.outputs.sha }}
         run: |
           set -euo pipefail
           shopt -s nullglob
           files=(e2e/proof/*.png)
-          issue_id="$(printf '%s\n%s' "${{ github.event.pull_request.title }}" "${{ github.head_ref }}" | grep -oiE 'LIQ-[0-9]+' | head -1 | tr '[:upper:]' '[:lower:]')"
-          BASE="https://raw.githubusercontent.com/${{ github.repository }}/${{ steps.proof.outputs.sha }}"
+          matched=()
+          if [ ${#files[@]} -gt 0 ]; then
+            mapfile -t matched < <(node scripts/post-linear-visual-proof.mjs --list-matching "${files[@]}")
+          fi
+          BASE="https://raw.githubusercontent.com/${{ github.repository }}/${PROOF_SHA}"
           BODY="## Visual proof (Playwright)
 
           CI run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -157,16 +172,15 @@ jobs:
           Screenshots below are published to branch \`pr-proof/pr-${{ github.event.pull_request.number }}\` so you can review without downloading the **help-parity-proof** artifact zip.
 
           "
-          for f in "${files[@]}"; do
-            name="$(basename "$f")"
-            if [ -z "$issue_id" ] || [[ "${name,,}" != *"$issue_id"* ]]; then
-              continue
-            fi
-            BODY="${BODY}
+          if [ -n "${PROOF_SHA:-}" ] && [ ${#matched[@]} -gt 0 ]; then
+            for f in "${matched[@]}"; do
+              name="$(basename "$f")"
+              BODY="${BODY}
           ### ${name}
           ![${name}](${BASE}/${name})
           "
-          done
+            done
+          fi
           BODY="${BODY}
           <details>
           <summary>Artifact backup</summary>
