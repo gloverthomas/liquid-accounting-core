@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * Upload Playwright proof PNGs to the Linear issue named in the PR title
- * (then branch, then body). Only PNGs whose filename contains that id.
+ * (then branch, then body outside HTML comments and sample ids).
+ * Only PNGs whose filename contains that id.
  * Requires LINEAR_API_KEY repo secret and pull_request event context.
  */
 import { readFile, readdir, stat } from "node:fs/promises";
@@ -37,9 +38,17 @@ async function linearGql(query, variables) {
 
 const ISSUE_RE = /LIQ-\d+/i;
 
-/** Title, then branch, then body. A body citation of an older ticket must not win. */
+/** Drop HTML comments and sample ids such as the PR template's "e.g. LIQ-16". */
+export function bodyForIssueId(body) {
+  if (!body) return "";
+  return body
+    .replace(/<!--[\s\S]*?-->/g, " ")
+    .replace(/\b(?:e\.?\s?g\.?|for example|example)\s+LIQ-\d+\b/gi, " ");
+}
+
+/** Title, then branch, then body text outside template comments. A sample id must not win. */
 export function issueIdForProof({ title, headRefName, body }) {
-  for (const text of [title, headRefName, body]) {
+  for (const text of [title, headRefName, bodyForIssueId(body)]) {
     const match = text?.match(ISSUE_RE);
     if (match?.[0]) return match[0].toUpperCase();
   }

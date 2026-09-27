@@ -164,6 +164,10 @@ jobs:
           if [ ${#files[@]} -gt 0 ]; then
             mapfile -t matched < <(node scripts/post-linear-visual-proof.mjs --list-matching "${files[@]}")
           fi
+          if [ -z "${PROOF_SHA:-}" ] || [ ${#matched[@]} -eq 0 ]; then
+            echo "No matching proof images were published; not posting a visual-proof comment."
+            exit 0
+          fi
           BASE="https://raw.githubusercontent.com/${{ github.repository }}/${PROOF_SHA}"
           BODY="## Visual proof (Playwright)
 
@@ -172,15 +176,13 @@ jobs:
           Screenshots below are published to branch \`pr-proof/pr-${{ github.event.pull_request.number }}\` so you can review without downloading the **help-parity-proof** artifact zip.
 
           "
-          if [ -n "${PROOF_SHA:-}" ] && [ ${#matched[@]} -gt 0 ]; then
-            for f in "${matched[@]}"; do
-              name="$(basename "$f")"
-              BODY="${BODY}
+          for f in "${matched[@]}"; do
+            name="$(basename "$f")"
+            BODY="${BODY}
           ### ${name}
           ![${name}](${BASE}/${name})
           "
-            done
-          fi
+          done
           BODY="${BODY}
           <details>
           <summary>Artifact backup</summary>
