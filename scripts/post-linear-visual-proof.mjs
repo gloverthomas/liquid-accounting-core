@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 /**
- * Upload Playwright proof PNGs to linked Linear issues (LIQ-* in PR title/body/branch).
+ * Upload Playwright proof PNGs to the Linear issue named in the PR title
+ * (then branch, then body outside HTML comments and sample ids).
+ * Only PNGs whose filename contains that id.
  * Requires LINEAR_API_KEY repo secret and pull_request event context.
  */
 import { readFile, readdir, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { execSync } from "node:child_process";
+import { pathToFileURL } from "node:url";
 
 const LINEAR_API_KEY = process.env.LINEAR_API_KEY?.trim();
 const PR_NUMBER = process.env.PR_NUMBER?.trim();
@@ -33,14 +36,47 @@ async function linearGql(query, variables) {
   return json.data;
 }
 
-function extractIssueIds(...texts) {
-  const ids = new Set();
-  const re = /LIQ-\d+/gi;
-  for (const t of texts) {
-    if (!t) continue;
-    for (const m of t.matchAll(re)) ids.add(m[0].toUpperCase());
+const ISSUE_RE = /LIQ-\d+/i;
+
+/** Drop HTML comments and sample ids such as the PR template's "e.g. LIQ-16". */
+export function bodyForIssueId(body) {
+  if (!body) return "";
+  return body
+    .replace(/<!--[\s\S]*?-->/g, " ")
+    .replace(/\b(?:e\.?\s?g\.?|for example|example)\s+LIQ-\d+\b/gi, " ");
+}
+
+/** Title, then branch, then body text outside template comments. A sample id must not win. */
+export function issueIdForProof({ title, headRefName, body }) {
+  for (const text of [title, headRefName, bodyForIssueId(body)]) {
+    const match = text?.match(ISSUE_RE);
+    if (match?.[0]) return match[0].toUpperCase();
   }
-  return [...ids];
+  return null;
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Whole token: LIQ-24 matches liq-24-open.png, not liq-241 or liq-2. LIQ-1 does not match liq-17. */
+export function filenameHasIssueId(name, issueId) {
+  if (!name || !issueId) return false;
+  const re = new RegExp(`(?:^|[^a-z0-9])${escapeRegExp(issueId)}(?![0-9])`, "i");
+  return re.test(name);
+}
+
+/** Only screenshots named for this ticket. Canned shots from other issues stay out. */
+export function pngsForIssue(pngs, issueId) {
+  if (!issueId) return [];
+  return pngs.filter((file) => filenameHasIssueId(file.name, issueId));
+}
+
+/** Paths whose basename contains the ticket id from title, then branch, then body. */
+export function matchingProofPaths(paths, source) {
+  const issueId = issueIdForProof(source);
+  const files = paths.filter(Boolean).map((path) => ({ path, name: basename(path) }));
+  return pngsForIssue(files, issueId).map((file) => file.path);
 }
 
 async function listPngs(dir) {
@@ -137,16 +173,21 @@ async function main() {
     return;
   }
 
-  const issueIds = extractIssueIds(pr.title, pr.body, pr.headRefName);
-  if (issueIds.length === 0) {
-    console.log("No LIQ-* id in PR title, body, or branch; skipping Linear.");
+  const issueId = issueIdForProof({
+    title: pr.title,
+    headRefName: pr.headRefName,
+    body: pr.body,
+  });
+  if (!issueId) {
+    console.log("No LIQ-* id in PR title, branch, or body; skipping Linear.");
     return;
   }
 
   let pngs = await listPngs(PROOF_DIR);
   if (pngs.length === 0) pngs = await listPngs("e2e/proof");
+  pngs = pngsForIssue(pngs, issueId);
   if (pngs.length === 0) {
-    console.log("No proof PNGs found; skipping Linear.");
+    console.log(`No proof PNGs named for ${issueId}; not posting screenshots from other tickets.`);
     return;
   }
 
@@ -155,7 +196,7 @@ async function main() {
     uploaded.push(await uploadFileToLinear(file));
   }
 
-  for (const identifier of issueIds) {
+  for (const identifier of [issueId]) {
     const issueData = await linearGql(
       `query($id: String!) { issue(id: $id) { id identifier title } }`,
       { id: identifier },
@@ -189,7 +230,29 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error("Linear visual proof upload failed (non-fatal for CI):", err);
-  process.exit(0);
-});
+function listMatchingCli(argv) {
+  const flag = argv.indexOf("--list-matching");
+  const paths = argv.slice(flag + 1).filter((arg) => arg && !arg.startsWith("--"));
+  const matched = matchingProofPaths(paths, {
+    title: process.env.PR_TITLE ?? "",
+    headRefName: process.env.PR_HEAD ?? "",
+    body: process.env.PR_BODY ?? "",
+  });
+  for (const path of matched) console.log(path);
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  if (process.argv.includes("--list-matching")) {
+    try {
+      listMatchingCli(process.argv);
+    } catch (err) {
+      console.error(err);
+      process.exit(1);
+    }
+  } else {
+    main().catch((err) => {
+      console.error("Linear visual proof upload failed (non-fatal for CI):", err);
+      process.exit(0);
+    });
+  }
+}
