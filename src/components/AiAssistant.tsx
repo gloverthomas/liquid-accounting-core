@@ -1,7 +1,7 @@
 /*
-  This is the Core AI Assistant. History lists each saved chat, and opening one restores it.
-  It does not post a product signal. An empty list says there are no chats yet, and an empty state does not file. Send and New chat still work.
-  Next: the saved chat stays in this browser. Reporting is the copy that hides the list.
+  This is the Core AI Assistant. History lists each saved chat, and opening one restores it. Open invoices asked for as a table draw as a table. Revenue by month draws as a chart. Pop out opens the same thread in an in-page dialog.
+  It does not post a product signal. An empty History does not file. Opening the assistant does not file. A normal prose answer does not file.
+  Next: the saved chat, table, chart, and dialog stay in this browser. Reporting is the copy that fails the table.
 */
 
 import { type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
@@ -27,11 +27,19 @@ export type AssistantTable = {
   rows: string[][];
 };
 
+export type AssistantChart = {
+  points: { label: string; value: number }[];
+};
+
+export type AssistantAnswerKind = "table" | "chart";
+
 export type AssistantMessage = {
   id: string;
   role: "user" | "assistant";
   text: string;
+  answerKind?: AssistantAnswerKind | null;
   table?: AssistantTable | null;
+  chart?: AssistantChart | null;
   cta?: { label: string; href: string } | null;
   provider?: string;
   rationale?: string;
@@ -40,7 +48,9 @@ export type AssistantMessage = {
 
 type ChatResponse = {
   reply?: string;
+  answerKind?: AssistantAnswerKind | null;
   table?: AssistantTable | null;
+  chart?: AssistantChart | null;
   cta?: { label: string; href: string } | null;
   provider?: string;
   rationale?: string;
@@ -90,6 +100,27 @@ function normalizeTable(table: unknown): AssistantTable | null {
     headers: candidate.headers.map((h) => String(h)),
     rows: candidate.rows.map((row) => (Array.isArray(row) ? row.map((c) => String(c)) : [])),
   };
+}
+
+function normalizeAnswerKind(value: unknown): AssistantAnswerKind | null {
+  return value === "table" || value === "chart" ? value : null;
+}
+
+function normalizeChart(chart: unknown): AssistantChart | null {
+  if (!chart || typeof chart !== "object") return null;
+  const points = (chart as { points?: unknown }).points;
+  if (!Array.isArray(points)) return null;
+  const normalized = points
+    .map((point) => {
+      if (!point || typeof point !== "object") return null;
+      const label = String((point as { label?: unknown }).label ?? "").trim();
+      const value = Number((point as { value?: unknown }).value);
+      if (!label || !Number.isFinite(value)) return null;
+      return { label, value };
+    })
+    .filter((point): point is { label: string; value: number } => point !== null)
+    .slice(0, 12);
+  return normalized.length ? { points: normalized } : null;
 }
 
 function normalizeRelated(value: unknown): string[] {
@@ -205,6 +236,78 @@ function CalculationAccordion({
 }
 
 /*
+  Draws the open-invoice rows as a table in the reply.
+  The rows come from the app when the question asks for open invoices in a table. This does not post a product signal.
+  Next: the table stays in the reply. Reporting is the copy that fails this draw.
+*/
+function renderAnswerTable(message: AssistantMessage): ReactNode {
+  if (message.answerKind !== "table" || !message.table?.rows.length) return null;
+  const table = message.table;
+  return (
+    <div className="ai-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            {table.headers.map((header, headerIndex) => (
+              <th key={`${message.id}-answer-h-${headerIndex}`} scope="col">
+                {header}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {table.rows.map((row, index) => (
+            <tr key={`${message.id}-answer-row-${index}`}>
+              {row.map((cell, cellIndex) => (
+                <td key={`${message.id}-answer-${index}-${cellIndex}`}>{cell}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/*
+  Draws revenue by month as a simple bar chart in the reply.
+  The points come from the app. This does not post a product signal.
+  A later demo can fail this click on Reporting only. Next: the bars stay in the reply.
+*/
+function renderAnswerChart(message: AssistantMessage): ReactNode {
+  if (message.answerKind !== "chart" || !message.chart?.points.length) return null;
+  const points = message.chart.points;
+  const width = 280;
+  const height = 120;
+  const max = Math.max(...points.map((point) => point.value), 1);
+  const barWidth = 48;
+  const gap = 28;
+  return (
+    <figure className="ai-chart">
+      <svg role="img" aria-label="Revenue by month" viewBox={`0 0 ${width} ${height + 36}`} width="100%">
+        <title>Revenue by month</title>
+        {points.map((point, index) => {
+          const barHeight = Math.max(4, (point.value / max) * (height - 16));
+          const x = 20 + index * (barWidth + gap);
+          const y = height - barHeight;
+          return (
+            <g key={point.label}>
+              <rect x={x} y={y} width={barWidth} height={barHeight} rx="4" fill="#ff292e" />
+              <text x={x + barWidth / 2} y={height + 16} textAnchor="middle" fontSize="12" fill="#374151">
+                {point.label}
+              </text>
+              <text x={x + barWidth / 2} y={y - 4} textAnchor="middle" fontSize="10" fill="#6b7280">
+                {point.value.toLocaleString("en-AU")}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+    </figure>
+  );
+}
+
+/*
   Core is the working copy. It does not post a product signal.
   This list is what Reporting fails to show: each saved chat, and opening one restores it.
   An empty list says there are no chats yet. An empty state does not file.
@@ -254,11 +357,18 @@ export function AiAssistant({
   const [context, setContext] = useState(contextLabel);
   const [error, setError] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [poppedOut, setPoppedOut] = useState(false);
   const [chats, setChats] = useState<StoredChat[]>(() => loadChats());
 
   useEffect(() => {
     setContext(contextLabel);
   }, [contextLabel]);
+
+  useEffect(() => {
+    if (!open) {
+      setPoppedOut(false);
+    }
+  }, [open]);
 
   useEffect(() => {
     if (!messages.some((message) => message.role === "user")) return;
@@ -272,6 +382,9 @@ export function AiAssistant({
           role: message.role,
           text: message.text,
           relatedQuestions: message.relatedQuestions,
+          answerKind: message.answerKind,
+          table: message.table,
+          chart: message.chart,
         })),
       }),
     );
@@ -280,16 +393,61 @@ export function AiAssistant({
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key !== "Escape") return;
+      if (poppedOut) {
+        setPoppedOut(false);
+        return;
+      }
+      onClose();
     };
     window.addEventListener("keydown", onKey);
     queueMicrotask(() => inputRef.current?.focus());
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  }, [open, onClose, poppedOut]);
+
+  useEffect(() => {
+    if (!open || !poppedOut) return;
+    
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+      
+      const focusableSelector = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+      const dialog = document.querySelector('.ai-assistant.is-popped');
+      if (!dialog) return;
+      
+      const focusableElements = Array.from(dialog.querySelectorAll(focusableSelector)) as HTMLElement[];
+      const firstFocusable = focusableElements[0];
+      const lastFocusable = focusableElements[focusableElements.length - 1];
+      
+      if (event.shiftKey) {
+        if (document.activeElement === firstFocusable) {
+          event.preventDefault();
+          lastFocusable?.focus();
+        }
+      } else {
+        if (document.activeElement === lastFocusable) {
+          event.preventDefault();
+          firstFocusable?.focus();
+        }
+      }
+    };
+    
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open, poppedOut]);
 
   useEffect(() => {
     scrollerRef.current?.scrollTo({ top: scrollerRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, busy, error]);
+
+  /*
+    Expands the current assistant thread into an in-page dialog. Closing it returns to the docked assistant. The thread is the same one.
+    This does not post a product signal. Opening the assistant does not file.
+    A later demo can fail this click on Reporting only. Next: the dialog stays on this page. It does not open a new window.
+  */
+  const togglePopOut = useCallback(() => {
+    setPoppedOut((value) => !value);
+  }, []);
 
   const relatedQuestions = useMemo(() => {
     if (messages.length === 0) return WELCOME_SUGGESTIONS;
@@ -346,7 +504,9 @@ export function AiAssistant({
             id: newId(),
             role: "assistant",
             text: data.reply ?? "I could not generate a reply.",
+            answerKind: normalizeAnswerKind(data.answerKind),
             table: normalizeTable(data.table),
+            chart: normalizeChart(data.chart),
             cta: data.cta
               ? (() => {
                   const href = safeCtaHref(data.cta?.href);
@@ -381,9 +541,14 @@ export function AiAssistant({
   const empty = messages.length === 0;
 
   return (
+    <>
+    {poppedOut ? (
+      <button type="button" className="ai-popout-backdrop" aria-label="Close pop out" onClick={() => setPoppedOut(false)} />
+    ) : null}
     <aside
-      className="ai-assistant"
-      role="complementary"
+      className={`ai-assistant${poppedOut ? " is-popped" : ""}`}
+      role={poppedOut ? "dialog" : "complementary"}
+      aria-modal={poppedOut ? true : undefined}
       aria-labelledby={titleId}
       data-broken={broken ? "true" : "false"}
     >
@@ -417,7 +582,13 @@ export function AiAssistant({
           >
             <Plus size={16} />
           </button>
-          <button type="button" className="ai-icon-btn" aria-label="Pop out" disabled>
+          <button
+            type="button"
+            className="ai-icon-btn"
+            aria-label="Pop out"
+            aria-pressed={poppedOut}
+            onClick={togglePopOut}
+          >
             <ExternalLink size={16} />
           </button>
           <button type="button" className="ai-icon-btn" aria-label="Close assistant" onClick={onClose}>
@@ -439,6 +610,9 @@ export function AiAssistant({
                   role: message.role,
                   text: message.text,
                   relatedQuestions: message.relatedQuestions,
+                  answerKind: message.answerKind,
+                  table: message.table,
+                  chart: message.chart,
                 })),
               );
               setError(null);
@@ -463,7 +637,9 @@ export function AiAssistant({
                 ) : (
                   <div className="ai-bubble-assistant">
                     <AssistantMarkdown text={message.text} />
-                    {message.table ? (
+                    {message.answerKind === "table" ? renderAnswerTable(message) : null}
+                    {message.answerKind === "chart" ? renderAnswerChart(message) : null}
+                    {message.answerKind !== "table" && message.table ? (
                       <div className="ai-table-wrap">
                         <table>
                           <thead>
@@ -573,5 +749,6 @@ export function AiAssistant({
         <p className="ai-disclaimer">All responses may be inaccurate. Verify important information.</p>
       </footer>
     </aside>
+    </>
   );
 }

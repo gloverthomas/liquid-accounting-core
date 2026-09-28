@@ -20,6 +20,15 @@ beforeEach(() => {
 });
 
 describe("hosted assistant handler with BotID", () => {
+  it("returns open-invoice rows from the app for a verified browser", async () => {
+    checkBotId.mockResolvedValue({ isBot: false, isHuman: true });
+    const out = await call(browser, { message: "Show my open invoices in a table" });
+    expect(out.status).toBe(200);
+    expect(out.json.answerKind).toBe("table");
+    expect(out.json.table.rows[0][0]).toBe("INV-1042");
+    expect(out.json.reply).not.toMatch(/\|/);
+  });
+
   it("answers verified browsers", async () => {
     checkBotId.mockResolvedValue({ isBot: false, isHuman: true });
     const out = await call(browser);

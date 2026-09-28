@@ -140,7 +140,64 @@ function sanitizeHistory(history) {
     .slice(-6);
 }
 
+/*
+  Answers two known questions from the app, not from the model.
+  “Show my open invoices in a table” returns invoice rows. “Show revenue by month as a chart” returns a few month amounts.
+  Next: the assistant draws those rows or points. The model is not asked to emit a markdown table.
+*/
+function structuredAssistantAnswer(message) {
+  const lower = String(message ?? "").toLowerCase();
+  if (lower.includes("open invoice") && lower.includes("table")) {
+    return {
+      reply: "These invoices are still open on the Liquid Coffee Co. demo books.",
+      answerKind: "table",
+      table: {
+        headers: ["Invoice", "Customer", "Due", "Amount"],
+        rows: [
+          ["INV-1042", "Northwind Cafe", "3 Oct 2026", "$1,240"],
+          ["INV-1048", "Harbor Roasters", "8 Oct 2026", "$860"],
+          ["INV-1051", "Elm Street Bakery", "15 Oct 2026", "$2,015"],
+        ],
+      },
+      chart: null,
+      cta: null,
+      provider: "fixture",
+      rationale: "Listed unpaid invoices from Liquid Coffee Co. demo books. The rows come from the app.",
+      relatedQuestions: [
+        "Which open invoice is the largest?",
+        "What's my gross profit margin?",
+        "How does this quarter compare to last?",
+      ],
+    };
+  }
+  if (lower.includes("revenue") && lower.includes("chart")) {
+    return {
+      reply: "Revenue by month on the Liquid Coffee Co. demo books.",
+      answerKind: "chart",
+      table: null,
+      chart: {
+        points: [
+          { label: "Jul", value: 18200 },
+          { label: "Aug", value: 21450 },
+          { label: "Sep", value: 19680 },
+        ],
+      },
+      cta: null,
+      provider: "fixture",
+      rationale: "Summed monthly revenue from Liquid Coffee Co. demo books. The points come from the app.",
+      relatedQuestions: [
+        "Which month was strongest?",
+        "What's my gross profit margin?",
+        "How does this quarter compare to last?",
+      ],
+    };
+  }
+  return null;
+}
+
 function fixtureAssistantReply(message) {
+  const structured = structuredAssistantAnswer(message);
+  if (structured) return structured;
   const lower = String(message ?? "").toLowerCase();
   if (lower.includes("quarter") || lower.includes("compare")) {
     return {
@@ -349,7 +406,10 @@ const server = createServer(async (request, response) => {
       }
 
       let payload;
-      if (xaiApiKey) {
+      const structured = structuredAssistantAnswer(message);
+      if (structured) {
+        payload = structured;
+      } else if (xaiApiKey) {
         try {
           payload = await callGrok({
             message,
