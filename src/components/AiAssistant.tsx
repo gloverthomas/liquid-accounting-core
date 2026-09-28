@@ -306,10 +306,12 @@ export function AiAssistant({
       const userMsg: AssistantMessage = { id: newId(), role: "user", text: trimmed };
       setMessages((prev) => [...prev, userMsg]);
       setBusy(true);
+      const requestConversationId = conversationId.current;
 
       if (broken) {
         onMessageOutcome?.("failed");
         await new Promise((r) => setTimeout(r, 450));
+        if (conversationId.current !== requestConversationId) return;
         setBusy(false);
         setError(
           "Assistant service unavailable in Reporting. The AI rail was ported from Core, but /api/v1/assistant/chat was never wired on this BFF.",
@@ -331,6 +333,7 @@ export function AiAssistant({
         if (!res.ok) {
           throw new Error(data.error ?? `assistant_http_${res.status}`);
         }
+        if (conversationId.current !== requestConversationId) return;
         setMessages((prev) => [
           ...prev,
           {
@@ -355,10 +358,13 @@ export function AiAssistant({
         ]);
         onMessageOutcome?.("answered");
       } catch (err) {
+        if (conversationId.current !== requestConversationId) return;
         onMessageOutcome?.("failed");
         setError(err instanceof Error ? err.message : "assistant_failed");
       } finally {
-        setBusy(false);
+        if (conversationId.current === requestConversationId) {
+          setBusy(false);
+        }
       }
     },
     [busy, broken, context, messages, onMessageOutcome],
@@ -399,6 +405,7 @@ export function AiAssistant({
               conversationId.current = newId();
               setMessages([]);
               setError(null);
+              setBusy(false);
               setHistoryOpen(false);
             }}
           >
@@ -428,6 +435,7 @@ export function AiAssistant({
                 })),
               );
               setError(null);
+              setBusy(false);
               setHistoryOpen(false);
             }}
           />
