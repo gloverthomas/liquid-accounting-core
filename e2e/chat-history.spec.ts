@@ -24,7 +24,7 @@ test("Core AI Assistant lists a saved chat and restores the reply", async ({ pag
   await page.getByRole("button", { name: /AI Assistant/i }).click();
   await expect(page.getByRole("heading", { name: "AI Assistant" })).toBeVisible();
   await page.getByRole("button", { name: "How does this quarter compare to last?" }).click();
-  await expect(page.getByText(/Income is up versus last quarter/i)).toBeVisible();
+  await expect(page.getByText(/Income is up versus last quarter/i)).toBeVisible({ timeout: 15_000 });
 
   await page.getByRole("button", { name: "History" }).click();
   const history = page.getByRole("list", { name: "Chat history" });

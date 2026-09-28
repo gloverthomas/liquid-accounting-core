@@ -784,7 +784,13 @@ function App() {
 export default App;
 
 // Vercel BotID: the assistant endpoint only spends the xAI key for verified browsers.
-initBotId({ protect: [{ path: "/api/v1/assistant/chat", method: "POST" }] });
+// Skip on loopback so Playwright (vite preview) and local prod builds can hit the BFF or route mocks.
+const isLoopbackHost =
+  typeof window !== "undefined" &&
+  (window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost");
+if (import.meta.env.PROD && !isLoopbackHost) {
+  initBotId({ protect: [{ path: "/api/v1/assistant/chat", method: "POST" }] });
+}
 
 createRoot(document.getElementById("root")!).render(
   <Sentry.ErrorBoundary fallback={<p>Something went wrong loading Liquid.</p>}>
