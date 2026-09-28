@@ -14,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import liquidMark from "../assets/liquid-mark.png";
+import { chatTitle, loadChats, rememberChat, type StoredChat } from "../assistantHistory";
 
 export type AssistantTable = {
   headers: string[];
@@ -197,6 +198,38 @@ function CalculationAccordion({
   );
 }
 
+/*
+  Core is the working copy. It does not post a product signal.
+  This list is what Reporting fails to show: each saved chat, and opening one restores it.
+  An empty list says there are no chats yet. An empty state does not file.
+*/
+function ChatHistoryPanel({
+  chats,
+  onOpen,
+}: {
+  chats: StoredChat[];
+  onOpen: (chat: StoredChat) => void;
+}) {
+  return (
+    <div className="ai-history">
+      <h3>Chat history</h3>
+      {chats.length === 0 ? (
+        <p className="ai-history-empty">No chats yet. Send a question, then open History.</p>
+      ) : (
+        <ul className="ai-history-list" aria-label="Chat history">
+          {chats.map((chat) => (
+            <li key={chat.id}>
+              <button type="button" onClick={() => onOpen(chat)}>
+                {chat.title}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export function AiAssistant({
   open,
   onClose,
@@ -208,15 +241,35 @@ export function AiAssistant({
   const titleId = useId();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const conversationId = useRef(newId());
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [context, setContext] = useState(contextLabel);
   const [error, setError] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [chats, setChats] = useState<StoredChat[]>(() => loadChats());
 
   useEffect(() => {
     setContext(contextLabel);
   }, [contextLabel]);
+
+  useEffect(() => {
+    if (!messages.some((message) => message.role === "user")) return;
+    setChats(
+      rememberChat({
+        id: conversationId.current,
+        title: chatTitle(messages),
+        updatedAt: Date.now(),
+        messages: messages.map((message) => ({
+          id: message.id,
+          role: message.role,
+          text: message.text,
+          relatedQuestions: message.relatedQuestions,
+        })),
+      }),
+    );
+  }, [messages]);
 
   useEffect(() => {
     if (!open) return;
@@ -247,15 +300,18 @@ export function AiAssistant({
     async (text: string) => {
       const trimmed = text.trim();
       if (!trimmed || busy) return;
+      setHistoryOpen(false);
       setError(null);
       setDraft("");
       const userMsg: AssistantMessage = { id: newId(), role: "user", text: trimmed };
       setMessages((prev) => [...prev, userMsg]);
       setBusy(true);
+      const requestConversationId = conversationId.current;
 
       if (broken) {
         onMessageOutcome?.("failed");
         await new Promise((r) => setTimeout(r, 450));
+        if (conversationId.current !== requestConversationId) return;
         setBusy(false);
         setError(
           "Assistant service unavailable in Reporting. The AI rail was ported from Core, but /api/v1/assistant/chat was never wired on this BFF.",
@@ -277,6 +333,7 @@ export function AiAssistant({
         if (!res.ok) {
           throw new Error(data.error ?? `assistant_http_${res.status}`);
         }
+        if (conversationId.current !== requestConversationId) return;
         setMessages((prev) => [
           ...prev,
           {
@@ -301,10 +358,13 @@ export function AiAssistant({
         ]);
         onMessageOutcome?.("answered");
       } catch (err) {
+        if (conversationId.current !== requestConversationId) return;
         onMessageOutcome?.("failed");
         setError(err instanceof Error ? err.message : "assistant_failed");
       } finally {
-        setBusy(false);
+        if (conversationId.current === requestConversationId) {
+          setBusy(false);
+        }
       }
     },
     [busy, broken, context, messages, onMessageOutcome],
@@ -328,7 +388,13 @@ export function AiAssistant({
           <span className="ai-assistant-beta">Beta</span>
         </div>
         <div className="ai-assistant-header-actions">
-          <button type="button" className="ai-icon-btn" aria-label="History" disabled>
+          <button
+            type="button"
+            className="ai-icon-btn"
+            aria-label="History"
+            aria-pressed={historyOpen}
+            onClick={() => setHistoryOpen((value) => !value)}
+          >
             <Clock3 size={16} />
           </button>
           <button
@@ -336,8 +402,11 @@ export function AiAssistant({
             className="ai-icon-btn"
             aria-label="New chat"
             onClick={() => {
+              conversationId.current = newId();
               setMessages([]);
               setError(null);
+              setBusy(false);
+              setHistoryOpen(false);
             }}
           >
             <Plus size={16} />
@@ -352,7 +421,28 @@ export function AiAssistant({
       </header>
 
       <div className="ai-assistant-body" ref={scrollerRef}>
-        {empty ? (
+        {historyOpen ? (
+          <ChatHistoryPanel
+            chats={chats}
+            onOpen={(chat) => {
+              const isDifferentConversation = conversationId.current !== chat.id;
+              conversationId.current = chat.id;
+              setMessages(
+                chat.messages.map((message) => ({
+                  id: message.id,
+                  role: message.role,
+                  text: message.text,
+                  relatedQuestions: message.relatedQuestions,
+                })),
+              );
+              setError(null);
+              if (isDifferentConversation) {
+                setBusy(false);
+              }
+              setHistoryOpen(false);
+            }}
+          />
+        ) : empty ? (
           <div className="ai-assistant-welcome">
             <img className="ai-welcome-mark" src={liquidMark} alt="" width={40} height={40} />
             <h3>Hello {userName}!</h3>
