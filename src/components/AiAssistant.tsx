@@ -198,6 +198,11 @@ function CalculationAccordion({
   );
 }
 
+/*
+  Core is the working copy. It does not post a product signal.
+  This list is what Reporting fails to show: each saved chat, and opening one restores it.
+  An empty list says there are no chats yet. An empty state does not file.
+*/
 function ChatHistoryPanel({
   chats,
   onOpen,
