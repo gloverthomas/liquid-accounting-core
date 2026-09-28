@@ -368,6 +368,25 @@ td strong { color: #374151; font-weight: 600; }
 }
 .ai-icon-btn:hover:not(:disabled) { background: #f3f4f6; color: #111827; }
 .ai-icon-btn:disabled { opacity: 0.45; cursor: default; }
+.ai-icon-btn[aria-pressed="true"] { background: #fff0f0; color: #ff292e; }
+.ai-history { display: flex; flex-direction: column; gap: 10px; }
+.ai-history h3 { margin: 0; font-size: 14px; }
+.ai-history-empty { margin: 0; color: #6b7280; font-size: 13px; }
+.ai-history-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.ai-history-list button {
+  width: 100%;
+  text-align: left;
+  border: 1px solid #e6e7e9;
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+  cursor: pointer;
+}
+.ai-history-list button:hover { border-color: #ff292e; background: #fff0f0; }
 .ai-assistant-body { flex: 1; min-height: 0; overflow: auto; padding: 18px 16px 12px; }
 .ai-assistant-welcome {
   display: grid;

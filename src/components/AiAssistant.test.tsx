@@ -25,6 +25,7 @@ function mockChatOk(overrides: Record<string, unknown> = {}) {
 
 describe("AiAssistant", () => {
   beforeEach(() => {
+    localStorage.clear();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
@@ -100,6 +101,44 @@ describe("AiAssistant", () => {
     expect(
       screen.queryByRole("button", { name: /How does this quarter compare to last\?/i }),
     ).not.toBeInTheDocument();
+  });
+
+  it("lists a saved chat in History and restores the reply", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal("fetch", mockChatOk());
+
+    render(<AiAssistant open onClose={() => undefined} />);
+    await user.click(screen.getByRole("button", { name: "History" }));
+    expect(screen.getByText(/No chats yet/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "History" }));
+
+    await user.click(
+      screen.getByRole("button", { name: /How does this quarter compare to last\?/i }),
+    );
+    expect(await screen.findByText(/Income is up versus last quarter/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "History" }));
+    const list = screen.getByRole("list", { name: "Chat history" });
+    expect(
+      within(list).getByRole("button", { name: /How does this quarter compare to last\?/i }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "New chat" }));
+    expect(screen.getByRole("heading", { name: /Hello Jordan/i })).toBeInTheDocument();
+    expect(screen.queryByText(/Income is up versus last quarter/i)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "History" }));
+    const saved = screen.getByRole("list", { name: "Chat history" });
+    await user.click(
+      within(saved).getByRole("button", { name: /How does this quarter compare to last\?/i }),
+    );
+
+    expect(screen.getByText(/Income is up versus last quarter/i)).toBeInTheDocument();
+    expect(
+      within(screen.getByLabelText(/Related questions/i)).getByRole("button", {
+        name: /What drove the increase\?/i,
+      }),
+    ).toBeInTheDocument();
   });
 
   it("clears the thread with New chat", async () => {
