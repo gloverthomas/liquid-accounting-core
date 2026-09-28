@@ -8,6 +8,9 @@ export interface StoredChatMessage {
   role: "user" | "assistant";
   text: string;
   relatedQuestions?: string[];
+  answerKind?: "table" | "chart" | null;
+  table?: { headers: string[]; rows: string[][] } | null;
+  chart?: { points: { label: string; value: number }[] } | null;
 }
 
 export interface StoredChat {

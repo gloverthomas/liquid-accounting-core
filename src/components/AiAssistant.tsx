@@ -365,6 +365,12 @@ export function AiAssistant({
   }, [contextLabel]);
 
   useEffect(() => {
+    if (!open) {
+      setPoppedOut(false);
+    }
+  }, [open]);
+
+  useEffect(() => {
     if (!messages.some((message) => message.role === "user")) return;
     setChats(
       rememberChat({
@@ -376,6 +382,9 @@ export function AiAssistant({
           role: message.role,
           text: message.text,
           relatedQuestions: message.relatedQuestions,
+          answerKind: message.answerKind,
+          table: message.table,
+          chart: message.chart,
         })),
       }),
     );
@@ -395,6 +404,37 @@ export function AiAssistant({
     queueMicrotask(() => inputRef.current?.focus());
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose, poppedOut]);
+
+  useEffect(() => {
+    if (!open || !poppedOut) return;
+    
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+      
+      const focusableSelector = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+      const dialog = document.querySelector('.ai-assistant.is-popped');
+      if (!dialog) return;
+      
+      const focusableElements = Array.from(dialog.querySelectorAll(focusableSelector)) as HTMLElement[];
+      const firstFocusable = focusableElements[0];
+      const lastFocusable = focusableElements[focusableElements.length - 1];
+      
+      if (event.shiftKey) {
+        if (document.activeElement === firstFocusable) {
+          event.preventDefault();
+          lastFocusable?.focus();
+        }
+      } else {
+        if (document.activeElement === lastFocusable) {
+          event.preventDefault();
+          firstFocusable?.focus();
+        }
+      }
+    };
+    
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open, poppedOut]);
 
   useEffect(() => {
     scrollerRef.current?.scrollTo({ top: scrollerRef.current.scrollHeight, behavior: "smooth" });
@@ -570,6 +610,9 @@ export function AiAssistant({
                   role: message.role,
                   text: message.text,
                   relatedQuestions: message.relatedQuestions,
+                  answerKind: message.answerKind,
+                  table: message.table,
+                  chart: message.chart,
                 })),
               );
               setError(null);
