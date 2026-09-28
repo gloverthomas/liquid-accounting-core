@@ -387,6 +387,30 @@ td strong { color: #374151; font-weight: 600; }
   cursor: pointer;
 }
 .ai-history-list button:hover { border-color: #ff292e; background: #fff0f0; }
+.ai-popout-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  border: 0;
+  background: rgba(17, 24, 39, 0.45);
+  cursor: default;
+}
+.ai-assistant.is-popped {
+  position: fixed;
+  z-index: 51;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(720px, calc(100vw - 48px));
+  height: min(720px, calc(100dvh - 48px));
+  max-height: calc(100dvh - 48px);
+  flex: none;
+  border: 1px solid #e6e7e9;
+  border-radius: 16px;
+  box-shadow: 0 24px 80px rgba(17, 24, 39, 0.28);
+}
+.ai-chart { margin: 0; }
+.ai-chart svg { display: block; width: 100%; height: auto; }
 .ai-assistant-body { flex: 1; min-height: 0; overflow: auto; padding: 18px 16px 12px; }
 .ai-assistant-welcome {
   display: grid;

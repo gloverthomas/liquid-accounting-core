@@ -205,6 +205,96 @@ describe("AiAssistant", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("renders open invoice rows as a table and does not signal", async () => {
+    const user = userEvent.setup();
+    const fetchMock = mockChatOk({
+      reply: "These invoices are still open on the Liquid Coffee Co. demo books.",
+      answerKind: "table",
+      table: {
+        headers: ["Invoice", "Customer", "Due", "Amount"],
+        rows: [["INV-1042", "Northwind Cafe", "3 Oct 2026", "$1,240"]],
+      },
+      chart: null,
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<AiAssistant open onClose={() => undefined} />);
+    await user.type(screen.getByLabelText(/Ask the AI assistant/i), "Show my open invoices in a table{Enter}");
+
+    expect(await screen.findByRole("cell", { name: "INV-1042" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Invoice" })).toBeInTheDocument();
+    expect(screen.queryByText("Answer failed to render as a table")).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.some((call) => call[0] === "/api/v1/product/signal")).toBe(false);
+  });
+
+  it("draws revenue by month as a chart and does not signal", async () => {
+    const user = userEvent.setup();
+    const fetchMock = mockChatOk({
+      reply: "Revenue by month on the Liquid Coffee Co. demo books.",
+      answerKind: "chart",
+      table: null,
+      chart: {
+        points: [
+          { label: "Jul", value: 18200 },
+          { label: "Aug", value: 21450 },
+          { label: "Sep", value: 19680 },
+        ],
+      },
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<AiAssistant open onClose={() => undefined} />);
+    await user.type(screen.getByLabelText(/Ask the AI assistant/i), "Show revenue by month as a chart{Enter}");
+
+    expect(await screen.findByRole("img", { name: "Revenue by month" })).toBeInTheDocument();
+    expect(screen.getByText("Jul")).toBeInTheDocument();
+    expect(screen.getByText("Aug")).toBeInTheDocument();
+    expect(screen.queryByText("Answer failed to render as a table")).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.some((call) => call[0] === "/api/v1/product/signal")).toBe(false);
+  });
+
+  it("opens and closes pop out on the same thread and does not signal", async () => {
+    const user = userEvent.setup();
+    const fetchMock = mockChatOk();
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<AiAssistant open onClose={() => undefined} />);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: /How does this quarter compare to last\?/i }));
+    expect(await screen.findByText(/Income is up versus last quarter/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Pop out" }));
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText(/Income is up versus last quarter/i)).toBeInTheDocument();
+    expect(screen.queryByRole("complementary")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Pop out" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(within(screen.getByRole("complementary")).getByText(/Income is up versus last quarter/i)).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some((call) => call[0] === "/api/v1/product/signal")).toBe(false);
+  });
+
+  it("does not signal for a normal prose answer", async () => {
+    const user = userEvent.setup();
+    const fetchMock = mockChatOk({
+      reply: "Gross profit margin is about 58% this quarter.",
+      answerKind: null,
+      table: null,
+      chart: null,
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<AiAssistant open onClose={() => undefined} />);
+    await user.type(screen.getByLabelText(/Ask the AI assistant/i), "What's my gross profit margin?{Enter}");
+
+    expect(await screen.findByText(/58% this quarter/i)).toBeInTheDocument();
+    expect(screen.queryByText("Answer failed to render as a table")).not.toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "Revenue by month" })).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.some((call) => call[0] === "/api/v1/product/signal")).toBe(false);
+  });
+
   describe("usage outcomes (analytics, never message text)", () => {
     const ask = async (props: Partial<Parameters<typeof AiAssistant>[0]> = {}) => {
       const user = userEvent.setup();
