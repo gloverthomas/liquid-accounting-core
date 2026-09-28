@@ -1,3 +1,9 @@
+/*
+  This is the Core AI Assistant. History lists each saved chat, and opening one restores it.
+  It does not post a product signal. An empty list says there are no chats yet, and an empty state does not file. Send and New chat still work.
+  Next: the saved chat stays in this browser. Reporting is the copy that hides the list.
+*/
+
 import { type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
